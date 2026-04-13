@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WH40K Damage Calculator · 10th Edition</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#121212;--bg-card:#1e1e1e;--bg-card2:#2a2a2a;--bg-input:#2e2e2e;
+      --border:#3a3a3a;--text:#f0f0f0;--text-muted:#999;--text-hint:#666;
+      --accent:#BA7517;--accent-light:#f0a030;
+      --green-bg:#1a2a0a;--green-text:#8fcf3a;
+      --amber-bg:#2a1a00;--amber-text:#e0a030;
+      --blue:#378ADD;--blue-bg:#0a1a2a;
+      --radius:10px;--radius-sm:6px
+    }
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;min-height:100vh}
+    .app{max-width:480px;margin:0 auto;padding:16px 16px 40px}
+    .hdr{text-align:center;padding:20px 0 22px}
+    .hdr h1{font-size:22px;font-weight:600;letter-spacing:.02em;color:var(--accent-light)}
+    .hdr p{font-size:12px;color:var(--text-muted);margin-top:4px;letter-spacing:.05em;text-transform:uppercase}
+    .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;position:relative}
+    .card-title{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;display:flex;align-items:center;gap:6px;padding-right:28px}
+    .atk-num{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--accent);color:#fff;font-size:9px;font-weight:700;flex-shrink:0}
+    .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
+    .field{display:flex;flex-direction:column;gap:6px}
+    .field label{font-size:12px;color:var(--text-muted)}
+    .field input,.field select{background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:15px;padding:8px 10px;width:100%;outline:none;-webkit-appearance:none;appearance:none}
+    .field input:focus,.field select:focus{border-color:var(--accent)}
+    select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
+    .cb-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+    .cb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer;padding:9px 11px;border:1px solid var(--border);border-radius:var(--radius-sm);transition:background .15s,border-color .15s;user-select:none}
+    .cb:hover{background:var(--bg-card2)}
+    .cb.ticked{border-color:var(--accent);background:#2a1e00}
+    .cb input{width:15px;height:15px;cursor:pointer;accent-color:var(--accent)}
+    .cb-sus{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);padding:9px 11px;border:1px solid var(--border);border-radius:var(--radius-sm);transition:background .15s,border-color .15s;user-select:none}
+    .cb-sus:hover{background:var(--bg-card2)}
+    .cb-sus.ticked{border-color:var(--accent);background:#2a1e00}
+    .cb-sus input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--accent);flex-shrink:0}
+    .cb-sus .sus-lbl{flex:1;cursor:pointer}
+    .cb-sus select{width:46px;flex-shrink:0;font-size:12px;padding:2px 16px 2px 6px;background-position:right 2px center;background-color:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);-webkit-appearance:none;appearance:none;outline:none}
+    .del-btn{position:absolute;top:13px;right:13px;width:20px;height:20px;border-radius:50%;border:1px solid var(--border);background:var(--bg-card2);color:var(--text-muted);font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s,border-color .15s;padding:0;font-family:inherit}
+    .del-btn:hover{background:#3a0a0a;color:#e05050;border-color:#c03030}
+    .add-card{background:transparent;border:2px dashed var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px;text-align:center;color:var(--text-muted);font-size:14px;cursor:pointer;transition:background .15s,border-color .15s,color .15s;display:flex;align-items:center;justify-content:center;gap:10px}
+    .add-card:hover{background:var(--bg-card);border-color:var(--accent);color:var(--accent-light)}
+    .add-icon{width:24px;height:24px;border-radius:50%;border:2px solid currentColor;display:inline-flex;align-items:center;justify-content:center;font-size:18px;font-weight:300;line-height:1;flex-shrink:0}
+    .dmg-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .cb-dmg{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer;padding:9px 11px;border:1px solid var(--border);border-radius:var(--radius-sm);transition:background .15s,border-color .15s;user-select:none;line-height:1.4}
+    .cb-dmg:hover{background:var(--bg-card2)}
+    .cb-dmg.ticked{border-color:var(--blue);background:var(--blue-bg)}
+    .cb-dmg input{width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:var(--blue)}
+    .cb-cover{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer;padding:9px 11px;border:1px solid var(--border);border-radius:var(--radius-sm);transition:background .15s,border-color .15s;margin-top:8px;user-select:none}
+    .cb-cover:hover{background:var(--bg-card2)}
+    .cb-cover.active{border-color:#639922;background:var(--green-bg)}
+    .cb-cover input{width:15px;height:15px;cursor:pointer;accent-color:#639922}
+    .cover-note{font-size:11px;margin-top:8px;padding:7px 11px;border-radius:var(--radius-sm);display:none;line-height:1.5}
+    .cover-note.show{display:block}
+    .cover-note.ok{background:var(--green-bg);color:var(--green-text);border:1px solid #2a4a10}
+    .cover-note.warn{background:var(--amber-bg);color:var(--amber-text);border:1px solid #4a3000}
+    .sec-label{font-size:10px;font-weight:600;color:var(--text-hint);text-transform:uppercase;letter-spacing:.08em;margin:12px 0 8px}
+    .disclaimer{font-size:11px;color:var(--text-hint);margin-top:10px;font-style:italic}
+    .res-card{background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+    .res-title{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px}
+    .metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+    .met{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px}
+    .ml{font-size:11px;color:var(--text-muted);margin-bottom:3px}
+    .mv{font-size:22px;font-weight:600;color:var(--text)}
+    .big-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+    .stat-box{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:13px;text-align:center}
+    .stat-box .sl{font-size:11px;color:var(--text-muted);margin-bottom:4px}
+    .stat-box .sv{font-size:30px;font-weight:700}
+    .sv-kills{color:var(--accent-light)}
+    .sv-atk{color:var(--blue)}
+    .chain{display:flex;align-items:center;justify-content:space-between;padding:0 2px;margin-bottom:12px}
+    .cs{text-align:center;flex:1}
+    .cn{font-size:16px;font-weight:600;color:var(--text)}
+    .cl{font-size:10px;color:var(--text-muted);margin-top:2px}
+    .ca{color:var(--text-hint);font-size:14px;flex:0;padding:0 2px}
+    .note{font-size:11px;color:var(--text-muted);text-align:center;line-height:1.6;padding-top:10px;border-top:1px solid var(--border)}
+    .bk-hdr{display:flex;font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.07em;padding:0 10px 4px;gap:4px}
+    .bk-row{display:flex;align-items:center;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 10px;margin-bottom:4px;gap:4px;font-size:13px}
+    .bk-row.total{border-color:var(--accent);background:#1e1800}
+    .bk-lbl{flex:1;display:flex;align-items:center;gap:6px;color:var(--text-muted)}
+    .bk-hits{min-width:50px;text-align:right;color:var(--text)}
+    .bk-dmg{min-width:60px;text-align:right;color:var(--blue)}
+    .bk-kills{min-width:70px;text-align:right;color:var(--accent-light);font-weight:600}
+    optgroup{color:var(--text-muted);font-size:12px}
+    option{background:var(--bg-input);color:var(--text)}
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="hdr">
+    <h1>Damage Calculator</h1>
+    <p>Warhammer 40,000 · 10th Edition</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title" onclick="toggleAC()" style="cursor:pointer;justify-content:space-between;padding-right:0;margin-bottom:0;user-select:none">
+      Attack Calculator
+      <span id="ac-arrow" style="font-size:12px;color:var(--text-hint);font-weight:400">▸</span>
+    </div>
+    <div id="ac-body" style="display:none;margin-top:14px">
+      <div style="display:flex;gap:8px;align-items:flex-end">
+      <div class="field" style="flex:1">
+        <label>No. of Dice</label>
+        <select id="ac-num" onchange="calcAC()">
+          <option value="">—</option>
+          <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+          <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+          <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+          <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+          <option value="13">13</option><option value="14">14</option><option value="15">15</option>
+          <option value="16">16</option><option value="17">17</option><option value="18">18</option>
+          <option value="19">19</option><option value="20">20</option>
+        </select>
+      </div>
+      <div class="field" style="flex:1">
+        <label>Dice Type</label>
+        <select id="ac-die" onchange="calcAC()">
+          <option value="">—</option>
+          <option value="d3">d3</option>
+          <option value="d6">d6</option>
+        </select>
+      </div>
+      <div class="field" style="flex:1">
+        <label>Modifier</label>
+        <select id="ac-mod" onchange="calcAC()">
+          <option value="">—</option>
+          <option value="1">+1</option><option value="2">+2</option><option value="3">+3</option>
+          <option value="4">+4</option><option value="5">+5</option><option value="6">+6</option>
+          <option value="7">+7</option><option value="8">+8</option><option value="9">+9</option>
+          <option value="10">+10</option><option value="11">+11</option><option value="12">+12</option>
+        </select>
+      </div>
+      <div class="field" style="flex:1">
+        <label>Avg Attacks</label>
+        <div id="ac-result" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;font-size:20px;font-weight:600;color:var(--text-hint);text-align:center;line-height:1.55">—</div>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="atk-container"></div>
+
+  <div class="add-card" onclick="addAtk()">
+    <span class="add-icon">+</span>Add Weapon Profile
+  </div>
+
+  <div class="card">
+    <div class="card-title">Defender</div>
+    <div class="row3">
+      <div class="field"><label>Toughness</label>
+        <input type="number" id="toughness" value="4" min="1" max="14" oninput="calc()">
+      </div>
+      <div class="field"><label>Save</label>
+        <select id="save" onchange="calc()">
+          <option value="2">2+</option><option value="3" selected>3+</option>
+          <option value="4">4+</option><option value="5">5+</option>
+          <option value="6">6+</option><option value="7">—</option>
+        </select>
+      </div>
+      <div class="field"><label>Wounds</label>
+        <input type="number" id="defWounds" value="2" min="1" max="40" oninput="calc()">
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Invuln Save</label>
+        <select id="invuln" onchange="calc()">
+          <option value="7" selected>—</option><option value="2">2++</option>
+          <option value="3">3++</option><option value="4">4++</option>
+          <option value="5">5++</option><option value="6">6++</option>
+        </select>
+      </div>
+      <div class="field"><label>Feel No Pain</label>
+        <select id="fnp" onchange="calc()">
+          <option value="7" selected>—</option><option value="2">2+++</option>
+          <option value="3">3+++</option><option value="4">4+++</option>
+          <option value="5">5+++</option><option value="6">6+++</option>
+        </select>
+      </div>
+    </div>
+    <div class="cb-grid" style="margin-bottom:10px">
+      <label class="cb-dmg" id="lbl-mh">
+        <input type="checkbox" id="minusHit" onchange="syncLbl('minusHit','lbl-mh');calc()"> −1 to Hit
+      </label>
+      <label class="cb-dmg" id="lbl-mw">
+        <input type="checkbox" id="minusWound" onchange="syncLbl('minusWound','lbl-mw');calc()"> −1 to Wound
+      </label>
+    </div>
+    <div class="dmg-grid">
+      <label class="cb-dmg" id="lbl-dm1">
+        <input type="checkbox" id="dmgminus1" onchange="syncLbl('dmgminus1','lbl-dm1');calc()"> −1 Damage (min 1)
+      </label>
+      <label class="cb-dmg" id="lbl-hd">
+        <input type="checkbox" id="halfdmg" onchange="syncLbl('halfdmg','lbl-hd');calc()"> Half Damage (min 1)
+      </label>
+    </div>
+    <label class="cb-cover" id="coverLabel">
+      <input type="checkbox" id="cover" onchange="calc()"> Cover
+    </label>
+    <div class="cover-note" id="coverNote"></div>
+    <div class="field" style="margin-top:10px">
+      <label>Re-roll saves</label>
+      <select id="rrSave" onchange="calc()">
+        <option value="none">None</option>
+        <option value="ones">Re-roll 1s</option>
+        <option value="all">Re-roll all fails</option>
+      </select>
+    </div>
+None
+  </div>
+
+  <div class="res-card">
+    <div class="res-title">Results</div>
+    <div id="res-content"></div>
+  </div>
+
+  <div id="atk-container"></div>
+</div>
+
+<script>
+  var atks = [], uid = 1;
+
+  function mkAtk() {
+    return { id: uid++, a: 10, bs: 3, s: 4, ap: 0, d: '1',
+             torrent: false, lethal: false, sustained: false, sustainX: 1,
+             dev: false, ignoresCover: false, critX: 6,
+             rrh: 'none', rrw: 'none',
+             plusHit: false, plusWound: false, antiXVal: 'none' };
+  }
+
+  function dmgOpts(sel) {
+    var s = String(sel), o = '';
+    for (var i = 1; i <= 12; i++) o += '<option value="'+i+'"'+(s===String(i)?' selected':'')+'>'+i+'</option>';
+    o += '<optgroup label="d3"><option value="d3"'+(s==='d3'?' selected':'')+'>d3</option>';
+    for (var i = 1; i <= 6; i++) o += '<option value="d3+'+i+'"'+(s==='d3+'+i?' selected':'')+'>d3+'+i+'</option>';
+    o += '</optgroup><optgroup label="d6"><option value="d6"'+(s==='d6'?' selected':'')+'>d6</option>';
+    for (var i = 1; i <= 6; i++) o += '<option value="d6+'+i+'"'+(s==='d6+'+i?' selected':'')+'>d6+'+i+'</option>';
+    return o + '</optgroup>';
+  }
+
+  function cbCls(on) { return 'cb' + (on ? ' ticked' : ''); }
+
+  function cardHTML(atk, showDel, idx) {
+    var id = atk.id;
+    var bsOpts = [2,3,4,5,6].map(function(v){ return '<option value="'+v+'"'+(v==atk.bs?' selected':'')+'>'+v+'+</option>'; }).join('');
+    var apOpts = [0,-1,-2,-3,-4,-5,-6].map(function(v){ return '<option value="'+v+'"'+(v==atk.ap?' selected':'')+'>'+v+'</option>'; }).join('');
+    var cxOpts = [6,5,4,3,2].map(function(v){ return '<option value="'+v+'"'+((atk.critX||6)==v?' selected':'')+'>'+(v)+'+'+'</option>'; }).join('');
+    var axOpts = '<option value="none"'+(atk.antiXVal==='none'?' selected':'')+'>None</option>'
+      + [6,5,4,3,2].map(function(v){ return '<option value="'+v+'"'+(String(atk.antiXVal)===String(v)?' selected':'')+'>'+(v)+'+'+'</option>'; }).join('');
+    var sxOpts = [1,2,3,4,5,6].map(function(v){ return '<option value="'+v+'"'+((atk.sustainX||1)==v?' selected':'')+'>'+v+'</option>'; }).join('');
+    var rrhOpts = [['none','None'],['ones','Re-roll 1s'],['all','Re-roll all fails'],['crits','Fish for Crits']]
+      .map(function(p){ return '<option value="'+p[0]+'"'+(atk.rrh===p[0]?' selected':'')+'>'+p[1]+'</option>'; }).join('');
+    var rrwOpts = [['none','None'],['ones','Re-roll 1s'],['all','Re-roll fails'],['crits','Fish for Crits']]
+      .map(function(p){ return '<option value="'+p[0]+'"'+(atk.rrw===p[0]?' selected':'')+'>'+p[1]+'</option>'; }).join('');
+
+    return '<div class="card" data-atk="'+id+'">'
+      +(showDel ? '<button class="del-btn" onclick="delAtk('+id+')" title="Remove">\xd7</button>' : '')
+      +'<div class="card-title"><span class="atk-num">'+idx+'</span>Weapon Profile</div>'
+      +'<div class="row3">'
+        +'<div class="field"><label>Attacks</label>'
+          +'<input type="number" value="'+atk.a+'" min="1" max="100" oninput="setAtk('+id+',\'a\',+this.value)"></div>'
+        +'<div class="field"><label>BS / WS</label>'
+          +'<select onchange="setAtk('+id+',\'bs\',+this.value)">'+bsOpts+'</select></div>'
+        +'<div class="field"><label>Strength</label>'
+          +'<input type="number" value="'+atk.s+'" min="1" max="24" oninput="setAtk('+id+',\'s\',+this.value)"></div>'
+      +'</div>'
+      +'<div class="row2">'
+        +'<div class="field"><label>AP</label>'
+          +'<select onchange="setAtk('+id+',\'ap\',+this.value)">'+apOpts+'</select></div>'
+        +'<div class="field"><label>Damage</label>'
+          +'<select onchange="setAtk('+id+',\'d\',this.value)">'+dmgOpts(atk.d)+'</select></div>'
+      +'</div>'
+      +'<div class="cb-grid">'
+        +'<label class="'+cbCls(atk.plusHit)+'" id="lbl-ph'+id+'">'
+          +'<input type="checkbox"'+(atk.plusHit?' checked':'')+' onchange="setCb('+id+',\'plusHit\',this.checked,\'lbl-ph'+id+'\')"> +1 to Hit</label>'
+        +'<label class="'+cbCls(atk.plusWound)+'" id="lbl-pw'+id+'">'
+          +'<input type="checkbox"'+(atk.plusWound?' checked':'')+' onchange="setCb('+id+',\'plusWound\',this.checked,\'lbl-pw'+id+'\')"> +1 to Wound</label>'
+        +'<label class="'+cbCls(atk.lethal)+'" id="lbl-let'+id+'">'
+          +'<input type="checkbox"'+(atk.lethal?' checked':'')+' onchange="setCb('+id+',\'lethal\',this.checked,\'lbl-let'+id+'\')"> Lethal Hits</label>'
+        +'<div class="cb-sus '+(atk.sustained?'ticked':'')+'" id="lbl-sus'+id+'">'
+          +'<input type="checkbox" id="chk-sus'+id+'"'+(atk.sustained?' checked':'')+' onchange="toggleSustained('+id+',this.checked)">'
+          +'<span class="sus-lbl" onclick="document.getElementById(\'chk-sus'+id+'\').click()">Sustained Hits</span>'
+          +'<select id="ssx'+id+'" onchange="setAtk('+id+',\'sustainX\',+this.value);event.stopPropagation()" style="display:'+(atk.sustained?'inline-block':'none')+'">'+sxOpts+'</select>'
+        +'</div>'
+        +'<label class="'+cbCls(atk.torrent)+'" id="lbl-tor'+id+'">'
+          +'<input type="checkbox"'+(atk.torrent?' checked':'')+' onchange="setCb('+id+',\'torrent\',this.checked,\'lbl-tor'+id+'\')"> Torrent</label>'
+        +'<label class="'+cbCls(atk.ignoresCover)+'" id="lbl-ic'+id+'">'
+          +'<input type="checkbox"'+(atk.ignoresCover?' checked':'')+' onchange="setCb('+id+',\'ignoresCover\',this.checked,\'lbl-ic'+id+'\')"> Ignores Cover</label>'
+        +'<label class="'+cbCls(atk.dev)+'" id="lbl-dev'+id+'">'
+          +'<input type="checkbox"'+(atk.dev?' checked':'')+' onchange="setCb('+id+',\'dev\',this.checked,\'lbl-dev'+id+'\')"> Dev. Wounds</label>'
+        +'<div></div>'
+      +'</div>'
+      +'<div class="row2">'
+        +'<div class="field"><label>Re-roll hits</label>'
+          +'<select onchange="setAtk('+id+',\'rrh\',this.value)">'+rrhOpts+'</select></div>'
+        +'<div class="field"><label>Re-roll wounds</label>'
+          +'<select onchange="setAtk('+id+',\'rrw\',this.value)">'+rrwOpts+'</select></div>'
+      +'</div>'
+      +'<div class="row2" style="margin-bottom:0">'
+        +'<div class="field"><label>Crit Hits X+</label>'
+          +'<select onchange="setAtk('+id+',\'critX\',+this.value)">'+cxOpts+'</select></div>'
+        +'<div class="field"><label>Anti-X</label>'
+          +'<select onchange="setAtk('+id+',\'antiXVal\',this.value)">'+axOpts+'</select></div>'
+      +'</div>'
+    +'</div>';
+  }
+
+  function render() {
+    var showDel = atks.length > 1;
+    document.getElementById('atk-container').innerHTML = atks.map(function(a,i){ return cardHTML(a,showDel,i+1); }).join('');
+  }
+
+  function addAtk()        { atks.push(mkAtk()); render(); calc(); }
+  function delAtk(id)      { if(atks.length<=1) return; atks=atks.filter(function(a){ return a.id!==id; }); render(); calc(); }
+  function setAtk(id,k,v)  { var a=atks.find(function(a){ return a.id===id; }); if(a){ a[k]=v; calc(); } }
+  function setCb(id,k,v,l) { var a=atks.find(function(a){ return a.id===id; }); if(a){ a[k]=v; document.getElementById(l).classList.toggle('ticked',v); calc(); } }
+  function syncLbl(cbId,lblId) { document.getElementById(lblId).classList.toggle('ticked',document.getElementById(cbId).checked); }
+  function toggleSustained(id,v) {
+    var a=atks.find(function(a){ return a.id===id; }); if(!a) return;
+    a.sustained=v;
+    document.getElementById('lbl-sus'+id).classList.toggle('ticked',v);
+    var s=document.getElementById('ssx'+id); if(s) s.style.display=v?'inline-block':'none';
+    calc();
+  }
+
+  function rp(t) { return Math.max(0, Math.min(1, (7-t)/6)); }
+
+  function wt(s,t) {
+    if(s>=2*t) return 2; if(s>t) return 3;
+    if(s===t)  return 4; if(t>=2*s) return 6; return 5;
+  }
+
+  function effDmgAvg(dStr,half,minus1) {
+    var s=String(dStr).trim().toLowerCase();
+    if(/^\d+$/.test(s)) {
+      var v=parseInt(s);
+      if(half)   v=Math.max(1,Math.floor(v/2));
+      if(minus1) v=Math.max(1,v-1);
+      return Math.max(1,v);
+    }
+    var m=s.match(/^(\d+)?d(\d+)(?:\+(\d+))?$/);
+    if(!m) return 1;
+    var x=parseInt(m[1])||1, y=parseInt(m[2]), z=parseInt(m[3])||0;
+    var faces=[]; for(var i=1;i<=y;i++) faces.push(i);
+    var vals=faces.map(function(f){ var v=x*f+z; if(half) v=Math.floor(v/2); if(minus1) v=v-1; return Math.max(1,v); });
+    return vals.reduce(function(s,v){ return s+v; },0)/vals.length;
+  }
+
+  function calcOne(atk, def) {
+    var bs=atk.bs, S=atk.s, ap=atk.ap, dStr=atk.d;
+    var torrent=atk.torrent, lethal=atk.lethal, sustained=atk.sustained, dev=atk.dev, ignoresCover=atk.ignoresCover;
+    var rrh=atk.rrh, rrw=atk.rrw, plusHit=atk.plusHit, plusWound=atk.plusWound;
+    var sustainX=atk.sustainX||1, critX=Math.max(2,Math.min(6,+(atk.critX)||6));
+    var A=atk.a, T=def.T, sv2=def.sv2, inv=def.inv, fnpVal=def.fnpVal, W=def.W;
+    var cover=def.cover, half=def.half, minus1=def.minus1, minusHit=def.minusHit, minusWound=def.minusWound, rrSave=def.rrSave;
+    var effD=effDmgAvg(dStr,half,minus1);
+
+    var pCritNat=rp(critX);
+    var pCrit, pHit;
+    if(torrent) {
+      pCrit=0; pHit=1;
+    } else {
+      var effBs=Math.min(6,Math.max(2,bs-(plusHit?1:0)+(minusHit?1:0)));
+      var pHitMod=rp(effBs);
+      var pHitBase=Math.max(pHitMod,pCritNat);
+      pCrit=pCritNat; pHit=pHitBase;
+      if(rrh==='ones') {
+        pCrit=Math.min(1,pCrit+(1/6)*pCrit);
+        pHit=Math.min(1,pHit+(1/6)*pHitBase);
+        pCrit=Math.min(pCrit,pHit);
+      } else if(rrh==='all') {
+        var pMiss=1-pHitBase;
+        pCrit=Math.min(1,pCrit+pMiss*pCritNat);
+        pHit=Math.min(1,pHitBase+pMiss*pHitBase);
+        pCrit=Math.min(pCrit,pHit);
+      } else if(rrh==='crits') {
+        var pNonCrit=1-pCritNat;
+        pCrit=pCritNat+pNonCrit*pCritNat;
+        pHit=pCrit+pNonCrit*Math.max(0,pHitBase-pCritNat);
+      }
+    }
+    var cH=A*pCrit, nH=A*Math.max(0,pHit-pCrit);
+    if(sustained) nH+=cH*sustainX;
+    var totH=cH+nH;
+
+    var wTgt=wt(S,T);
+    var effWnd=Math.min(6,Math.max(2,wTgt-(plusWound?1:0)+(minusWound?1:0)));
+    var woundCritMin=6;
+    var axNum=parseInt(atk.antiXVal,10);
+    if(!isNaN(axNum)) {
+      var ax=Math.max(2,Math.min(6,axNum));
+      effWnd=Math.min(effWnd,ax);
+      woundCritMin=ax;
+    }
+    var bw=rp(effWnd);
+    var pCW=Math.min(rp(woundCritMin),bw), pNW=Math.max(0,bw-pCW);
+    if(rrw==='ones') {
+      pCW=Math.min(1,pCW*(7/6)); pNW=Math.min(1-pCW,pNW*(7/6));
+    } else if(rrw==='all') {
+      var pMissW=1-bw; pCW=Math.min(1,pCW+pMissW*pCW); pNW=Math.min(1-pCW,pNW+pMissW*pNW);
+    } else if(rrw==='crits') {
+      var pCW0=pCW, pNW0=Math.max(0,bw-pCW0), pNonCW=1-pCW0;
+      pCW=pCW0+pNonCW*pCW0; pNW=pNonCW*pNW0;
+    }
+
+    var cW, nW;
+    if(lethal) { cW=nH*pCW; nW=cH+nH*pNW; } else { cW=totH*pCW; nW=totH*pNW; }
+    var totW=cW+nW;
+
+    var effectiveCover=cover&&!ignoresCover, coverSupp=effectiveCover&&ap===0&&sv2<=3;
+    var aSv=sv2-ap; if(effectiveCover&&!coverSupp) aSv=Math.max(2,aSv-1);
+    var effSv=Math.min(aSv,inv);
+    var pSave=rp(effSv);
+    if(rrSave==='ones') pSave=Math.min(1,pSave*(7/6));
+    if(rrSave==='all')  pSave=Math.min(1,pSave+(1-pSave)*pSave);
+    var pFail=1-pSave;
+
+    var unsaved=dev?(cW+nW*pFail):totW*pFail;
+    var pFNP=fnpVal<7?rp(fnpVal):0;
+    var totDmg=unsaved*effD*(1-pFNP);
+    var kills=pFNP===0?unsaved/Math.ceil(W/effD):unsaved*Math.min(effD*(1-pFNP),W)/W;
+
+    return { totH:totH, totW:totW, unsaved:unsaved, totDmg:totDmg, kills:kills, effWnd:effWnd, effSv:effSv, pFail:pFail, pFNP:pFNP };
+  }
+
+  function calc() {
+    var T=+(document.getElementById('toughness').value)||4;
+    var sv2=+(document.getElementById('save').value);
+    var inv=+(document.getElementById('invuln').value);
+    var fnpVal=+(document.getElementById('fnp').value);
+    var W=Math.max(1,+(document.getElementById('defWounds').value)||1);
+    var cover=document.getElementById('cover').checked;
+    var half=document.getElementById('halfdmg').checked;
+    var minus1=document.getElementById('dmgminus1').checked;
+    var minusHit=document.getElementById('minusHit').checked;
+    var minusWound=document.getElementById('minusWound').checked;
+    var rrSave=document.getElementById('rrSave').value;
+    var def={T:T,sv2:sv2,inv:inv,fnpVal:fnpVal,W:W,cover:cover,half:half,minus1:minus1,minusHit:minusHit,minusWound:minusWound,rrSave:rrSave};
+
+    var noteEl=document.getElementById('coverNote'), lblEl=document.getElementById('coverLabel');
+    if(cover) {
+      var active=atks.filter(function(a){ return !(a.ap===0&&sv2<=3); });
+      var ign=atks.filter(function(a){ return a.ignoresCover; });
+      noteEl.classList.add('show');
+      if(active.length===0) {
+        noteEl.className='cover-note show warn';
+        noteEl.textContent='Cover has no effect — AP 0 vs save 3+ or better for all profiles.';
+        lblEl.classList.remove('active');
+      } else {
+        noteEl.className='cover-note show ok';
+        noteEl.textContent='Cover active — armour save improved by 1 where applicable.'+(ign.length?' '+ign.length+' profile(s) ignore cover.':'');
+        lblEl.classList.add('active');
+      }
+    } else { noteEl.className='cover-note'; lblEl.classList.remove('active'); }
+
+    var results=atks.map(function(a){ return calcOne(a,def); });
+    var totKills=results.reduce(function(s,r){ return s+r.kills; },0);
+    var totDmg=results.reduce(function(s,r){ return s+r.totDmg; },0);
+    var totA=atks.reduce(function(s,a){ return s+a.a; },0);
+    var atkPer=totKills>0?(totA/totKills).toFixed(2):'∞';
+
+    var html='';
+    if(atks.length===1) {
+      var r=results[0], a=atks[0];
+      var axActive=!isNaN(parseInt(a.antiXVal,10));
+      html='<div class="metrics">'
+        +'<div class="met"><div class="ml">Avg hits</div><div class="mv">'+r.totH.toFixed(2)+'</div></div>'
+        +'<div class="met"><div class="ml">Avg wounds</div><div class="mv">'+r.totW.toFixed(2)+'</div></div>'
+        +'<div class="met"><div class="ml">Unsaved wounds</div><div class="mv">'+r.unsaved.toFixed(2)+'</div></div>'
+        +'<div class="met"><div class="ml">Avg damage</div><div class="mv">'+r.totDmg.toFixed(2)+'</div></div>'
+        +'</div>'
+        +'<div class="big-stats">'
+          +'<div class="stat-box"><div class="sl">Expected models killed</div><div class="sv sv-kills">'+r.kills.toFixed(2)+'</div></div>'
+          +'<div class="stat-box"><div class="sl">Attacks to kill one</div><div class="sv sv-atk">'+atkPer+'</div></div>'
+        +'</div>'
+        +'<div class="chain">'
+          +'<div class="cs"><div class="cn">'+a.a+'</div><div class="cl">attacks</div></div>'
+          +'<div class="ca">→</div>'
+          +'<div class="cs"><div class="cn">'+r.totH.toFixed(2)+'</div><div class="cl">hits</div></div>'
+          +'<div class="ca">→</div>'
+          +'<div class="cs"><div class="cn">'+r.totW.toFixed(2)+'</div><div class="cl">wounds</div></div>'
+          +'<div class="ca">→</div>'
+          +'<div class="cs"><div class="cn">'+r.unsaved.toFixed(2)+'</div><div class="cl">unsaved</div></div>'
+          +'<div class="ca">→</div>'
+          +'<div class="cs"><div class="cn">'+r.totDmg.toFixed(2)+'</div><div class="cl">damage</div></div>'
+        +'</div>'
+        +'<div class="note">Wound on '+r.effWnd+'+'+(axActive?' (Anti-X '+a.antiXVal+'+)':'')
+          +' · Eff. save: '+(r.effSv>6?'none':r.effSv+'+')
+          +' ('+( r.pFail*100).toFixed(0)+'% fail)'
+          +(r.pFNP>0?' · FNP '+fnpVal+'+++'  :'')+'</div>';
+    } else {
+      html='<div class="bk-hdr"><span style="flex:1">Profile</span>'
+        +'<span style="min-width:50px;text-align:right">Hits</span>'
+        +'<span style="min-width:60px;text-align:right">Damage</span>'
+        +'<span style="min-width:70px;text-align:right">Kills</span></div>';
+      results.forEach(function(r,i){
+        html+='<div class="bk-row"><span class="bk-lbl"><span class="atk-num">'+(i+1)+'</span></span>'
+          +'<span class="bk-hits">'+r.totH.toFixed(2)+'</span>'
+          +'<span class="bk-dmg">'+r.totDmg.toFixed(2)+'</span>'
+          +'<span class="bk-kills">'+r.kills.toFixed(2)+'</span></div>';
+      });
+      html+='<div class="bk-row total">'
+        +'<span class="bk-lbl" style="color:var(--accent-light);font-weight:600">Total</span>'
+        +'<span class="bk-hits"></span>'
+        +'<span class="bk-dmg" style="color:var(--blue);font-weight:600">'+totDmg.toFixed(2)+'</span>'
+        +'<span class="bk-kills" style="font-size:17px">'+totKills.toFixed(2)+'</span></div>'
+        +'<div class="big-stats" style="margin-top:10px">'
+          +'<div class="stat-box"><div class="sl">Total expected kills</div><div class="sv sv-kills">'+totKills.toFixed(2)+'</div></div>'
+        +'</div>';
+    }
+    document.getElementById('res-content').innerHTML=html;
+  }
+
+  function toggleAC() {
+    var body  = document.getElementById('ac-body');
+    var arrow = document.getElementById('ac-arrow');
+    if (body.style.display === 'none') {
+      body.style.display = 'block';
+      arrow.textContent = '▾';
+    } else {
+      body.style.display = 'none';
+      arrow.textContent = '▸';
+    }
+  }
+
+  function calcAC() {
+    var num = document.getElementById('ac-num').value;
+    var die = document.getElementById('ac-die').value;
+    var mod = document.getElementById('ac-mod').value;
+    var el  = document.getElementById('ac-result');
+    if (!num || !die) {
+      el.textContent = '—';
+      el.style.color = 'var(--text-hint)';
+    } else {
+      var n   = parseInt(num);
+      var avg = (die === 'd3') ? 2 : 3.5;
+      var m   = mod ? parseInt(mod) : 0;
+      var r   = n * (avg + m);
+      el.textContent = (r % 1 === 0) ? String(r) : r.toFixed(2);
+      el.style.color = 'var(--accent-light)';
+    }
+  }
+
+  atks.push(mkAtk());
+  render();
+  calc();
+</script>
+</body>
+</html>
