@@ -253,7 +253,7 @@
     var sxOpts = [1,2,3,4,5,6].map(function(v){ return '<option value="'+v+'"'+((atk.sustainX||1)==v?' selected':'')+'>'+v+'</option>'; }).join('');
     var rrhOpts = [['none','None'],['ones','Re-roll 1s'],['all','Re-roll all fails'],['crits','Fish for Crits']]
       .map(function(p){ return '<option value="'+p[0]+'"'+(atk.rrh===p[0]?' selected':'')+'>'+p[1]+'</option>'; }).join('');
-    var rrwOpts = [['none','None'],['ones','Re-roll 1s'],['all','Re-roll fails'],['crits','Fish for Crits']]
+    var rrwOpts = [['none','None'],['ones','Re-roll 1s'],['all','Re-roll all fails'],['crits','Fish for Crits']]
       .map(function(p){ return '<option value="'+p[0]+'"'+(atk.rrw===p[0]?' selected':'')+'>'+p[1]+'</option>'; }).join('');
 
     return '<div class="card" data-atk="'+id+'">'
