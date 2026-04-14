@@ -95,6 +95,7 @@
     <p>Warhammer 40,000 · 10th Edition</p>
   </div>
 
+  <!-- ATTACK CALCULATOR -->
   <div class="card">
     <div class="card-title" onclick="toggleAC()" style="cursor:pointer;justify-content:space-between;padding-right:0;margin-bottom:0;user-select:none">
       Attack Calculator
@@ -138,6 +139,28 @@
           <div id="ac-result" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;font-size:20px;font-weight:600;color:var(--text-hint);text-align:center;line-height:1.55">&#8212;</div>
         </div>
       </div>
+      <div style="margin-top:10px">
+        <div class="field">
+          <label>Re-roll dice</label>
+          <select id="ac-rr" onchange="calcAC()">
+            <option value="0">None</option>
+            <option value="1">Re-roll 1s</option>
+            <option value="2">Re-roll 2s</option>
+            <option value="3">Re-roll 3s</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ATTACK DISTRIBUTION -->
+  <div id="ac-dist-card" class="card" style="display:none">
+    <div class="card-title" onclick="toggleACDist()" style="cursor:pointer;justify-content:space-between;padding-right:0;margin-bottom:0;user-select:none">
+      Attack Distribution
+      <span id="ac-dist-arrow" style="font-size:12px;color:var(--text-hint);font-weight:400">&#9663;</span>
+    </div>
+    <div id="ac-dist-body" style="margin-top:14px">
+      <div id="ac-dist-content"></div>
     </div>
   </div>
 
@@ -147,6 +170,7 @@
     <span class="add-icon">+</span>Add Weapon Profile
   </div>
 
+  <!-- DEFENDER -->
   <div class="card">
     <div class="card-title">Defender</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px">
@@ -213,23 +237,37 @@
     </div>
   </div>
 
+  <!-- RESULTS -->
   <div class="res-card">
     <div class="res-title">Results</div>
     <div id="res-content"></div>
   </div>
 
+  <!-- DAMAGE DISTRIBUTION -->
   <div class="card" style="margin-top:12px">
     <div class="card-title" onclick="toggleDist()" style="cursor:pointer;justify-content:space-between;padding-right:0;margin-bottom:0;user-select:none">
       Damage Distribution
       <span id="dist-arrow" style="font-size:12px;color:var(--text-hint);font-weight:400">&#9663;</span>
     </div>
-    <div id="dist-body" style="display:block;margin-top:14px">
+    <div id="dist-body" style="margin-top:14px">
       <div id="dist-content"></div>
     </div>
   </div>
 </div>
 
 <script>
+  function toggleACDist() {
+    var body  = document.getElementById('ac-dist-body');
+    var arrow = document.getElementById('ac-dist-arrow');
+    if (body.style.display === 'none') {
+      body.style.display = 'block';
+      arrow.innerHTML = '&#9663;';
+    } else {
+      body.style.display = 'none';
+      arrow.innerHTML = '&#9657;';
+    }
+  }
+
   function toggleAC() {
     var body  = document.getElementById('ac-body');
     var arrow = document.getElementById('ac-arrow');
@@ -246,18 +284,95 @@
     var num = document.getElementById('ac-num').value;
     var die = document.getElementById('ac-die').value;
     var mod = document.getElementById('ac-mod').value;
+    var rr  = parseInt(document.getElementById('ac-rr').value) || 0;
     var el  = document.getElementById('ac-result');
+    var distCard = document.getElementById('ac-dist-card');
     if (!num || !die) {
       el.innerHTML = '&#8212;';
       el.style.color = 'var(--text-hint)';
+      distCard.style.display = 'none';
     } else {
-      var n   = parseInt(num);
-      var avg = (die === 'd3') ? 2 : 3.5;
-      var m   = mod ? parseInt(mod) : 0;
-      var r   = n * (avg + m);
+      var n = parseInt(num);
+      var y = (die === 'd3') ? 3 : 6;
+      var m = mod ? parseInt(mod) : 0;
+      var baseAvg = (y + 1) / 2;
+      var rrAvg;
+      if (rr === 0) {
+        rrAvg = baseAvg;
+      } else {
+        var pRR = rr / y;
+        rrAvg = baseAvg + pRR * (baseAvg - (rr + 1) / 2);
+      }
+      var r = n * (rrAvg + m);
       el.textContent = (r % 1 === 0) ? String(r) : r.toFixed(2);
       el.style.color = 'var(--accent-light)';
+      renderACDist(n, die, m, rr);
+      distCard.style.display = 'block';
     }
+  }
+
+  function renderACDist(n, die, m, rr) {
+    var y = (die === 'd3') ? 3 : 6;
+    var rrThresh = rr || 0;
+    var i, j, k;
+    var faceDist = [];
+    for (i = 0; i <= y + m; i++) faceDist[i] = 0;
+    if (rrThresh === 0) {
+      for (i = 1; i <= y; i++) faceDist[i + m] = 1 / y;
+    } else {
+      var pRR = rrThresh / y;
+      var pKeep = 1 - pRR;
+      var rerollAvgIdx = 0;
+      for (i = 1; i <= y; i++) rerollAvgIdx += i / y;
+      for (i = 1; i <= y; i++) {
+        if (i <= rrThresh) {
+          for (j = 1; j <= y; j++) {
+            var idx = j + m;
+            if (idx < faceDist.length) faceDist[idx] += (1/y) * (1/y);
+            else { faceDist.push(0); faceDist[idx] += (1/y) * (1/y); }
+          }
+        } else {
+          faceDist[i + m] += 1 / y;
+        }
+      }
+    }
+    var combined = [1];
+    for (i = 0; i < n; i++) {
+      var next = [];
+      for (j = 0; j < combined.length + faceDist.length - 1; j++) next[j] = 0;
+      for (j = 0; j < combined.length; j++) {
+        for (k = 0; k < faceDist.length; k++) {
+          if (faceDist[k]) next[j + k] += (combined[j] || 0) * faceDist[k];
+        }
+      }
+      combined = next;
+    }
+    var maxProb = 0;
+    for (i = 0; i < combined.length; i++) { if ((combined[i] || 0) > maxProb) maxProb = combined[i]; }
+    if (maxProb === 0) maxProb = 1;
+    var cumAtLeast = [], cs = 0;
+    for (i = combined.length - 1; i >= 0; i--) { cs += combined[i] || 0; cumAtLeast[i] = Math.min(1, cs); }
+    var html = '';
+    html += '<div style="display:grid;grid-template-columns:68px 1fr 58px;gap:4px;margin-bottom:8px;padding:0 2px">';
+    html += '<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em">Attacks</span>';
+    html += '<span></span>';
+    html += '<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em;text-align:right">&#8805; this</span>';
+    html += '</div>';
+    for (i = 0; i < combined.length; i++) {
+      var prob = combined[i] || 0;
+      if (prob < 0.0001) continue;
+      var cumPct = (cumAtLeast[i] || 0) * 100;
+      var barW   = (prob / maxProb) * 100;
+      var hue    = Math.round((prob / maxProb) * 120);
+      html += '<div style="display:grid;grid-template-columns:68px 1fr 58px;gap:4px;align-items:center;margin-bottom:4px">';
+      html += '<span style="font-size:12px;color:var(--text-muted)">' + i + ' atk' + (i !== 1 ? 's' : '') + '</span>';
+      html += '<div style="background:var(--bg-input);border-radius:3px;height:16px;overflow:hidden">';
+      html += '<div style="width:' + barW.toFixed(1) + '%;height:100%;background:hsl(' + hue + ',55%,38%);border-radius:3px"></div>';
+      html += '</div>';
+      html += '<span style="font-size:12px;color:var(--text);text-align:right">' + cumPct.toFixed(1) + '%</span>';
+      html += '</div>';
+    }
+    document.getElementById('ac-dist-content').innerHTML = html;
   }
 
   var atks = [], uid = 1;
@@ -290,28 +405,20 @@
     var id = atk.id;
     var i, bsOpts = '', apOpts = '', cxOpts = '', axOpts = '', sxOpts = '';
     var rrhOpts = '', rrwOpts = '', rrdOpts = '';
-
     var bsVals = [2,3,4,5,6];
     for (i = 0; i < bsVals.length; i++) bsOpts += mkOpt(bsVals[i], bsVals[i]+'+', atk.bs);
-
     var apVals = [0,-1,-2,-3,-4,-5,-6];
     for (i = 0; i < apVals.length; i++) apOpts += mkOpt(apVals[i], apVals[i], atk.ap);
-
     var cxVals = [6,5,4,3,2];
     for (i = 0; i < cxVals.length; i++) cxOpts += mkOpt(cxVals[i], cxVals[i]+'+', atk.critX || 6);
-
     axOpts = mkOpt('none', 'None', atk.antiXVal);
     var axVals = [6,5,4,3,2];
     for (i = 0; i < axVals.length; i++) axOpts += mkOpt(axVals[i], axVals[i]+'+', atk.antiXVal);
-
     for (i = 1; i <= 6; i++) sxOpts += mkOpt(i, i, atk.sustainX || 1);
-
     var rrhPairs = [['none','None'],['ones','Re-roll 1s'],['all','Re-roll all fails'],['crits','Fish for Crits']];
     for (i = 0; i < rrhPairs.length; i++) rrhOpts += mkOpt(rrhPairs[i][0], rrhPairs[i][1], atk.rrh);
-
     var rrwPairs = [['none','None'],['ones','Re-roll 1s'],['all','Re-roll all fails'],['crits','Fish for Crits']];
     for (i = 0; i < rrwPairs.length; i++) rrwOpts += mkOpt(rrwPairs[i][0], rrwPairs[i][1], atk.rrw);
-
     var rrdPairs = [['none','None'],['ones','Re-roll 1s'],['twos','Re-roll 2s'],['threes','Re-roll 3s']];
     for (i = 0; i < rrdPairs.length; i++) rrdOpts += mkOpt(rrdPairs[i][0], rrdPairs[i][1], atk.rrd || 'none');
 
@@ -410,20 +517,17 @@
     if (rrd === 'ones')   rrThresh = 1;
     if (rrd === 'twos')   rrThresh = 2;
     if (rrd === 'threes') rrThresh = 3;
-
     if (/^\d+$/.test(s)) {
       var fv = parseInt(s);
       if (half)   fv = Math.max(1, Math.floor(fv / 2));
       if (minus1) fv = Math.max(1, fv - 1);
       return Math.max(1, fv);
     }
-
     var m = s.match(/^(\d+)?d(\d+)(?:\+(\d+))?$/);
     if (!m) return 1;
     var x = parseInt(m[1]) || 1;
     var y = parseInt(m[2]);
     var z = m[3] ? parseInt(m[3]) : 0;
-
     var i, v, vals = [], sum = 0;
     for (i = 1; i <= y; i++) {
       v = x * i + z;
@@ -433,9 +537,7 @@
       vals.push(v);
       sum += v;
     }
-
     if (rrThresh === 0) { return sum / y; }
-
     var avgAll = sum / y;
     var wSum = 0;
     for (i = 0; i < y; i++) {
@@ -443,8 +545,6 @@
     }
     return wSum / y;
   }
-
-  function getAtk(id) { var i; for (i = 0; i < atks.length; i++) { if (atks[i].id === id) return atks[i]; } return null; }
 
   function calcOne(atk, def) {
     var bs = atk.bs, S = atk.s, ap = atk.ap, dStr = atk.d;
@@ -458,7 +558,6 @@
     var cover = def.cover, half = def.half, minus1 = def.minus1;
     var minusHit = def.minusHit, minusWound = def.minusWound, rrSave = def.rrSave;
     var effD = effDmgAvg(dStr, half, minus1, atk.rrd || 'none');
-
     var pCritNat = rp(critX);
     var pCrit, pHit;
     if (torrent) {
@@ -487,7 +586,6 @@
     var nH = A * Math.max(0, pHit - pCrit);
     if (sustained) nH += cH * sustainX;
     var totH = cH + nH;
-
     var wTgt = wt(S, T);
     var effWnd = Math.min(6, Math.max(2, wTgt - (atk.plusWound ? 1 : 0) + (minusWound ? 1 : 0)));
     var woundCritMin = 6;
@@ -512,12 +610,10 @@
       pCW = pCW0 + pNonCW * pCW0;
       pNW = pNonCW * pNW0;
     }
-
     var cW, nW;
     if (lethal) { cW = nH * pCW; nW = cH + nH * pNW; }
     else        { cW = totH * pCW; nW = totH * pNW; }
     var totW = cW + nW;
-
     var effectiveCover = cover && !ignoresCover;
     var coverSupp = effectiveCover && ap === 0 && sv2 <= 3;
     var aSv = sv2 - ap;
@@ -527,123 +623,14 @@
     if (rrSave === 'ones') pSave = Math.min(1, pSave * (7/6));
     if (rrSave === 'all')  pSave = Math.min(1, pSave + (1 - pSave) * pSave);
     var pFail = 1 - pSave;
-
     var unsaved = dev ? (cW + nW * pFail) : totW * pFail;
     var pFNP = fnpVal < 7 ? rp(fnpVal) : 0;
     var totDmg = unsaved * effD * (1 - pFNP);
     var kills = pFNP === 0
       ? unsaved / Math.ceil(W / effD)
       : unsaved * Math.min(effD * (1 - pFNP), W) / W;
-
     return { totH: totH, totW: totW, unsaved: unsaved, totDmg: totDmg, kills: kills,
              effWnd: effWnd, effSv: effSv, pFail: pFail, pFNP: pFNP };
-  }
-
-  function calc() {
-    var unitSize = Math.max(1, +(document.getElementById('unitSize').value) || 1);
-    var T      = +(document.getElementById('toughness').value) || 4;
-    var sv2    = +(document.getElementById('save').value);
-    var inv    = +(document.getElementById('invuln').value);
-    var fnpVal = +(document.getElementById('fnp').value);
-    var W      = Math.max(1, +(document.getElementById('defWounds').value) || 1);
-    var cover  = document.getElementById('cover').checked;
-    var half   = document.getElementById('halfdmg').checked;
-    var minus1 = document.getElementById('dmgminus1').checked;
-    var minusHit   = document.getElementById('minusHit').checked;
-    var minusWound = document.getElementById('minusWound').checked;
-    var rrSave     = document.getElementById('rrSave').value;
-    var def = { T: T, sv2: sv2, inv: inv, fnpVal: fnpVal, W: W,
-                cover: cover, half: half, minus1: minus1,
-                minusHit: minusHit, minusWound: minusWound, rrSave: rrSave };
-
-    var noteEl = document.getElementById('coverNote');
-    var lblEl  = document.getElementById('coverLabel');
-    if (cover) {
-      var i, activeCt = 0, ignCt = 0;
-      for (i = 0; i < atks.length; i++) {
-        if (!(atks[i].ap === 0 && sv2 <= 3)) activeCt++;
-        if (atks[i].ignoresCover) ignCt++;
-      }
-      noteEl.classList.add('show');
-      if (activeCt === 0) {
-        noteEl.className = 'cover-note show warn';
-        noteEl.textContent = 'Cover has no effect — AP 0 vs save 3+ or better for all profiles.';
-        lblEl.classList.remove('active');
-      } else {
-        noteEl.className = 'cover-note show ok';
-        noteEl.textContent = 'Cover active — armour save improved by 1 where applicable.' + (ignCt ? ' ' + ignCt + ' profile(s) ignore cover.' : '');
-        lblEl.classList.add('active');
-      }
-    } else {
-      noteEl.className = 'cover-note';
-      lblEl.classList.remove('active');
-    }
-
-    var i, results = [];
-    for (i = 0; i < atks.length; i++) results.push(calcOne(atks[i], def));
-
-    var totKills = 0, totDmgAll = 0, totA = 0;
-    for (i = 0; i < results.length; i++) { totKills += results[i].kills; totDmgAll += results[i].totDmg; }
-    for (i = 0; i < atks.length; i++) totA += atks[i].a;
-    var atkPer = totKills > 0 ? (totA / totKills).toFixed(2) : '&#8734;';
-
-    var html = '';
-    if (atks.length === 1) {
-      var r = results[0], a = atks[0];
-      var axActive = !isNaN(parseInt(a.antiXVal, 10));
-      html += '<div class="metrics">';
-      html +=   '<div class="met"><div class="ml">Avg hits</div><div class="mv">' + r.totH.toFixed(2) + '</div></div>';
-      html +=   '<div class="met"><div class="ml">Avg wounds</div><div class="mv">' + r.totW.toFixed(2) + '</div></div>';
-      html +=   '<div class="met"><div class="ml">Unsaved wounds</div><div class="mv">' + r.unsaved.toFixed(2) + '</div></div>';
-      html +=   '<div class="met"><div class="ml">Avg damage</div><div class="mv">' + r.totDmg.toFixed(2) + '</div></div>';
-      html += '</div>';
-      html += '<div class="big-stats">';
-      html +=   '<div class="stat-box"><div class="sl">Expected models killed</div><div class="sv sv-kills">' + r.kills.toFixed(2) + '</div></div>';
-      if (unitSize > 1) {
-        var pctKilled = Math.min(100, (r.kills / unitSize) * 100);
-        html +=   '<div class="stat-box"><div class="sl">% of unit killed</div><div class="sv sv-kills">' + pctKilled.toFixed(1) + '%</div></div>';
-      } else {
-        html +=   '<div class="stat-box"><div class="sl">Shots needed to kill</div><div class="sv sv-atk">' + atkPer + '</div></div>';
-      }
-      html += '</div>';
-      html += '<div class="chain">';
-      html +=   '<div class="cs"><div class="cn">' + a.a + '</div><div class="cl">attacks</div></div>';
-      html +=   '<div class="ca">&#8594;</div>';
-      html +=   '<div class="cs"><div class="cn">' + r.totH.toFixed(2) + '</div><div class="cl">hits</div></div>';
-      html +=   '<div class="ca">&#8594;</div>';
-      html +=   '<div class="cs"><div class="cn">' + r.totW.toFixed(2) + '</div><div class="cl">wounds</div></div>';
-      html +=   '<div class="ca">&#8594;</div>';
-      html +=   '<div class="cs"><div class="cn">' + r.unsaved.toFixed(2) + '</div><div class="cl">unsaved</div></div>';
-      html +=   '<div class="ca">&#8594;</div>';
-      html +=   '<div class="cs"><div class="cn">' + r.totDmg.toFixed(2) + '</div><div class="cl">damage</div></div>';
-      html += '</div>';
-      html += '<div class="note">Wound on ' + r.effWnd + '+' + (axActive ? ' (Anti-X ' + a.antiXVal + '+)' : '')
-            + ' &#183; Eff. save: ' + (r.effSv > 6 ? 'none' : r.effSv + '+')
-            + ' (' + (r.pFail * 100).toFixed(0) + '% fail)'
-            + (r.pFNP > 0 ? ' &#183; FNP ' + fnpVal + '+++' : '') + '</div>';
-    } else {
-      html += '<div class="bk-hdr"><span style="flex:1">Profile</span>';
-      html += '<span style="min-width:50px;text-align:right">Hits</span>';
-      html += '<span style="min-width:60px;text-align:right">Damage</span>';
-      html += '<span style="min-width:70px;text-align:right">Kills</span></div>';
-      for (i = 0; i < results.length; i++) {
-        html += '<div class="bk-row"><span class="bk-lbl"><span class="atk-num">' + (i+1) + '</span></span>';
-        html += '<span class="bk-hits">' + results[i].totH.toFixed(2) + '</span>';
-        html += '<span class="bk-dmg">' + results[i].totDmg.toFixed(2) + '</span>';
-        html += '<span class="bk-kills">' + results[i].kills.toFixed(2) + '</span></div>';
-      }
-      html += '<div class="bk-row total">';
-      html += '<span class="bk-lbl" style="color:var(--accent-light);font-weight:600">Total</span>';
-      html += '<span class="bk-hits"></span>';
-      html += '<span class="bk-dmg" style="color:var(--blue);font-weight:600">' + totDmgAll.toFixed(2) + '</span>';
-      html += '<span class="bk-kills" style="font-size:17px">' + totKills.toFixed(2) + '</span></div>';
-      html += '<div class="big-stats" style="margin-top:10px">';
-      html += '<div class="stat-box"><div class="sl">Total expected kills</div><div class="sv sv-kills">' + totKills.toFixed(2) + '</div></div>';
-      html += '</div>';
-    }
-    document.getElementById('res-content').innerHTML = html;
-    var distBody = document.getElementById('dist-body');
-    if (distBody && distBody.style.display !== 'none') { renderDist(); }
   }
 
   function buildKillDist(atk, def) {
@@ -716,24 +703,17 @@
     var def = { T:T, sv2:sv2, inv:inv, fnpVal:fnpVal, W:W,
                 cover:cover, half:half, minus1:minus1,
                 minusHit:minusHit, minusWound:minusWound, rrSave:rrSave };
-
     var i, combined = [1];
     for (i = 0; i < atks.length; i++) combined = convolveDists(combined, buildKillDist(atks[i], def));
-
     var rowCap = unitSize * 2;
     var lastSig = 0;
-    for (i = 0; i < combined.length; i++) {
-      if ((combined[i] || 0) >= 0.001) lastSig = i;
-    }
+    for (i = 0; i < combined.length; i++) { if ((combined[i] || 0) >= 0.001) lastSig = i; }
     var maxShow = Math.max(5, Math.min(lastSig, rowCap));
-
     var maxProb = 0;
     for (i = 0; i <= maxShow; i++) { if ((combined[i] || 0) > maxProb) maxProb = combined[i]; }
     if (maxProb === 0) maxProb = 1;
-
     var cumAtLeast = [], cs = 0;
     for (i = combined.length - 1; i >= 0; i--) { cs += combined[i] || 0; cumAtLeast[i] = Math.min(1, cs); }
-
     var html = '';
     html += '<div style="display:grid;grid-template-columns:68px 1fr 58px 50px;gap:4px;margin-bottom:8px;padding:0 2px">';
     html += '<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em">Kills</span>';
@@ -741,24 +721,127 @@
     html += '<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em;text-align:right">&#8805; this</span>';
     html += '<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em;text-align:right">Prob</span>';
     html += '</div>';
-
     for (i = 0; i <= maxShow; i++) {
       var prob   = combined[i] || 0;
       var pct    = prob * 100;
       var cumPct = (cumAtLeast[i] || 0) * 100;
       var barW   = (prob / maxProb) * 100;
       var hue    = Math.round((prob / maxProb) * 120);
-      var barColor = 'hsl(' + hue + ',55%,38%)';
       html += '<div style="display:grid;grid-template-columns:68px 1fr 58px 50px;gap:4px;align-items:center;margin-bottom:4px">';
       html += '<span style="font-size:12px;color:var(--text-muted)">' + i + (i === 1 ? ' kill' : ' kills') + '</span>';
       html += '<div style="background:var(--bg-input);border-radius:3px;height:16px;overflow:hidden">';
-      html += '<div style="width:' + barW.toFixed(1) + '%;height:100%;background:' + barColor + ';border-radius:3px"></div>';
+      html += '<div style="width:' + barW.toFixed(1) + '%;height:100%;background:hsl(' + hue + ',55%,38%);border-radius:3px"></div>';
       html += '</div>';
       html += '<span style="font-size:12px;color:var(--text);text-align:right">' + cumPct.toFixed(1) + '%</span>';
       html += '<span style="font-size:12px;color:var(--text-muted);text-align:right">' + pct.toFixed(1) + '%</span>';
       html += '</div>';
     }
     document.getElementById('dist-content').innerHTML = html;
+  }
+
+  function calc() {
+    var T      = +(document.getElementById('toughness').value) || 4;
+    var sv2    = +(document.getElementById('save').value);
+    var inv    = +(document.getElementById('invuln').value);
+    var fnpVal = +(document.getElementById('fnp').value);
+    var W      = Math.max(1, +(document.getElementById('defWounds').value) || 1);
+    var unitSize = Math.max(1, +(document.getElementById('unitSize').value) || 1);
+    var cover  = document.getElementById('cover').checked;
+    var half   = document.getElementById('halfdmg').checked;
+    var minus1 = document.getElementById('dmgminus1').checked;
+    var minusHit   = document.getElementById('minusHit').checked;
+    var minusWound = document.getElementById('minusWound').checked;
+    var rrSave     = document.getElementById('rrSave').value;
+    var def = { T:T, sv2:sv2, inv:inv, fnpVal:fnpVal, W:W,
+                cover:cover, half:half, minus1:minus1,
+                minusHit:minusHit, minusWound:minusWound, rrSave:rrSave };
+
+    var noteEl = document.getElementById('coverNote');
+    var lblEl  = document.getElementById('coverLabel');
+    if (cover) {
+      var i, activeCt = 0, ignCt = 0;
+      for (i = 0; i < atks.length; i++) {
+        if (!(atks[i].ap === 0 && sv2 <= 3)) activeCt++;
+        if (atks[i].ignoresCover) ignCt++;
+      }
+      noteEl.classList.add('show');
+      if (activeCt === 0) {
+        noteEl.className = 'cover-note show warn';
+        noteEl.textContent = 'Cover has no effect — AP 0 vs save 3+ or better for all profiles.';
+        lblEl.classList.remove('active');
+      } else {
+        noteEl.className = 'cover-note show ok';
+        noteEl.textContent = 'Cover active — armour save improved by 1 where applicable.' + (ignCt ? ' ' + ignCt + ' profile(s) ignore cover.' : '');
+        lblEl.classList.add('active');
+      }
+    } else {
+      noteEl.className = 'cover-note';
+      lblEl.classList.remove('active');
+    }
+
+    var i, results = [];
+    for (i = 0; i < atks.length; i++) results.push(calcOne(atks[i], def));
+    var totKills = 0, totDmgAll = 0, totA = 0;
+    for (i = 0; i < results.length; i++) { totKills += results[i].kills; totDmgAll += results[i].totDmg; }
+    for (i = 0; i < atks.length; i++) totA += atks[i].a;
+    var atkPer = totKills > 0 ? (totA / totKills).toFixed(2) : '&#8734;';
+
+    var html = '';
+    if (atks.length === 1) {
+      var r = results[0], a = atks[0];
+      var axActive = !isNaN(parseInt(a.antiXVal, 10));
+      html += '<div class="metrics">';
+      html +=   '<div class="met"><div class="ml">Avg hits</div><div class="mv">' + r.totH.toFixed(2) + '</div></div>';
+      html +=   '<div class="met"><div class="ml">Avg wounds</div><div class="mv">' + r.totW.toFixed(2) + '</div></div>';
+      html +=   '<div class="met"><div class="ml">Unsaved wounds</div><div class="mv">' + r.unsaved.toFixed(2) + '</div></div>';
+      html +=   '<div class="met"><div class="ml">Avg damage</div><div class="mv">' + r.totDmg.toFixed(2) + '</div></div>';
+      html += '</div>';
+      html += '<div class="big-stats">';
+      html +=   '<div class="stat-box"><div class="sl">Expected models killed</div><div class="sv sv-kills">' + r.kills.toFixed(2) + '</div></div>';
+      if (unitSize > 1) {
+        var pctKilled = Math.min(100, (r.kills / unitSize) * 100);
+        html += '<div class="stat-box"><div class="sl">% of unit killed</div><div class="sv sv-kills">' + pctKilled.toFixed(1) + '%</div></div>';
+      } else {
+        html += '<div class="stat-box"><div class="sl">Shots needed to kill</div><div class="sv sv-atk">' + atkPer + '</div></div>';
+      }
+      html += '</div>';
+      html += '<div class="chain">';
+      html +=   '<div class="cs"><div class="cn">' + a.a + '</div><div class="cl">attacks</div></div>';
+      html +=   '<div class="ca">&#8594;</div>';
+      html +=   '<div class="cs"><div class="cn">' + r.totH.toFixed(2) + '</div><div class="cl">hits</div></div>';
+      html +=   '<div class="ca">&#8594;</div>';
+      html +=   '<div class="cs"><div class="cn">' + r.totW.toFixed(2) + '</div><div class="cl">wounds</div></div>';
+      html +=   '<div class="ca">&#8594;</div>';
+      html +=   '<div class="cs"><div class="cn">' + r.unsaved.toFixed(2) + '</div><div class="cl">unsaved</div></div>';
+      html +=   '<div class="ca">&#8594;</div>';
+      html +=   '<div class="cs"><div class="cn">' + r.totDmg.toFixed(2) + '</div><div class="cl">damage</div></div>';
+      html += '</div>';
+      html += '<div class="note">Wound on ' + r.effWnd + '+' + (axActive ? ' (Anti-X ' + a.antiXVal + '+)' : '')
+            + ' &#183; Eff. save: ' + (r.effSv > 6 ? 'none' : r.effSv + '+')
+            + ' (' + (r.pFail * 100).toFixed(0) + '% fail)'
+            + (r.pFNP > 0 ? ' &#183; FNP ' + fnpVal + '+++' : '') + '</div>';
+    } else {
+      html += '<div class="bk-hdr"><span style="flex:1">Profile</span>';
+      html += '<span style="min-width:50px;text-align:right">Hits</span>';
+      html += '<span style="min-width:60px;text-align:right">Damage</span>';
+      html += '<span style="min-width:70px;text-align:right">Kills</span></div>';
+      for (i = 0; i < results.length; i++) {
+        html += '<div class="bk-row"><span class="bk-lbl"><span class="atk-num">' + (i+1) + '</span></span>';
+        html += '<span class="bk-hits">' + results[i].totH.toFixed(2) + '</span>';
+        html += '<span class="bk-dmg">' + results[i].totDmg.toFixed(2) + '</span>';
+        html += '<span class="bk-kills">' + results[i].kills.toFixed(2) + '</span></div>';
+      }
+      html += '<div class="bk-row total">';
+      html += '<span class="bk-lbl" style="color:var(--accent-light);font-weight:600">Total</span>';
+      html += '<span class="bk-hits"></span>';
+      html += '<span class="bk-dmg" style="color:var(--blue);font-weight:600">' + totDmgAll.toFixed(2) + '</span>';
+      html += '<span class="bk-kills" style="font-size:17px">' + totKills.toFixed(2) + '</span></div>';
+      html += '<div class="big-stats" style="margin-top:10px">';
+      html += '<div class="stat-box"><div class="sl">Total expected kills</div><div class="sv sv-kills">' + totKills.toFixed(2) + '</div></div>';
+      html += '</div>';
+    }
+    document.getElementById('res-content').innerHTML = html;
+    renderDist();
   }
 
   atks.push(mkAtk());
