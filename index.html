@@ -149,7 +149,10 @@
 
   <div class="card">
     <div class="card-title">Defender</div>
-    <div class="row3">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+      <div class="field"><label>Models</label>
+        <input type="number" id="unitSize" value="1" min="1" max="30" oninput="calc()">
+      </div>
       <div class="field"><label>Toughness</label>
         <input type="number" id="toughness" value="4" min="1" max="14" oninput="calc()">
       </div>
@@ -213,6 +216,16 @@
   <div class="res-card">
     <div class="res-title">Results</div>
     <div id="res-content"></div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <div class="card-title" onclick="toggleDist()" style="cursor:pointer;justify-content:space-between;padding-right:0;margin-bottom:0;user-select:none">
+      Damage Distribution
+      <span id="dist-arrow" style="font-size:12px;color:var(--text-hint);font-weight:400">&#9663;</span>
+    </div>
+    <div id="dist-body" style="display:block;margin-top:14px">
+      <div id="dist-content"></div>
+    </div>
   </div>
 </div>
 
@@ -527,6 +540,7 @@
   }
 
   function calc() {
+    var unitSize = Math.max(1, +(document.getElementById('unitSize').value) || 1);
     var T      = +(document.getElementById('toughness').value) || 4;
     var sv2    = +(document.getElementById('save').value);
     var inv    = +(document.getElementById('invuln').value);
@@ -585,7 +599,12 @@
       html += '</div>';
       html += '<div class="big-stats">';
       html +=   '<div class="stat-box"><div class="sl">Expected models killed</div><div class="sv sv-kills">' + r.kills.toFixed(2) + '</div></div>';
-      html +=   '<div class="stat-box"><div class="sl">Attacks to kill one</div><div class="sv sv-atk">' + atkPer + '</div></div>';
+      if (unitSize > 1) {
+        var pctKilled = Math.min(100, (r.kills / unitSize) * 100);
+        html +=   '<div class="stat-box"><div class="sl">% of unit killed</div><div class="sv sv-kills">' + pctKilled.toFixed(1) + '%</div></div>';
+      } else {
+        html +=   '<div class="stat-box"><div class="sl">Shots needed to kill</div><div class="sv sv-atk">' + atkPer + '</div></div>';
+      }
       html += '</div>';
       html += '<div class="chain">';
       html +=   '<div class="cs"><div class="cn">' + a.a + '</div><div class="cl">attacks</div></div>';
@@ -623,6 +642,123 @@
       html += '</div>';
     }
     document.getElementById('res-content').innerHTML = html;
+    var distBody = document.getElementById('dist-body');
+    if (distBody && distBody.style.display !== 'none') { renderDist(); }
+  }
+
+  function buildKillDist(atk, def) {
+    var result = calcOne(atk, def);
+    var A = Math.max(1, atk.a);
+    var pPerAtk = Math.max(0, Math.min(0.99, result.unsaved / A));
+    var effD = effDmgAvg(atk.d, def.half, def.minus1, atk.rrd || 'none');
+    var pFNP = def.fnpVal < 7 ? rp(def.fnpVal) : 0;
+    var W = def.W;
+    var effDAdj = pFNP === 0 ? effD : Math.min(effD * (1 - pFNP), W);
+    var wnpk = Math.max(1, Math.round(W / Math.max(0.01, effDAdj)));
+    var pU = [], i, j;
+    for (i = 0; i <= A; i++) pU[i] = 0;
+    pU[0] = 1;
+    for (i = 0; i < A; i++) {
+      var next = [];
+      for (j = 0; j <= i + 1; j++) next[j] = 0;
+      for (j = 0; j <= i; j++) {
+        next[j]   += pU[j] * (1 - pPerAtk);
+        next[j+1] += pU[j] * pPerAtk;
+      }
+      pU = next;
+    }
+    var maxKills = Math.ceil(A / wnpk);
+    var pK = [];
+    for (i = 0; i <= maxKills; i++) pK[i] = 0;
+    for (var k = 0; k <= A; k++) {
+      var kills = Math.min(maxKills, Math.floor(k / wnpk));
+      pK[kills] += pU[k];
+    }
+    return pK;
+  }
+
+  function convolveDists(d1, d2) {
+    var len = d1.length + d2.length - 1;
+    var result = [], i, j;
+    for (i = 0; i < len; i++) result[i] = 0;
+    for (i = 0; i < d1.length; i++) {
+      for (j = 0; j < d2.length; j++) result[i+j] += d1[i] * d2[j];
+    }
+    return result;
+  }
+
+  function toggleDist() {
+    var body  = document.getElementById('dist-body');
+    var arrow = document.getElementById('dist-arrow');
+    if (body.style.display === 'none') {
+      body.style.display = 'block';
+      arrow.innerHTML = '&#9663;';
+      renderDist();
+    } else {
+      body.style.display = 'none';
+      arrow.innerHTML = '&#9657;';
+    }
+  }
+
+  function renderDist() {
+    var T        = +(document.getElementById('toughness').value) || 4;
+    var sv2      = +(document.getElementById('save').value);
+    var inv      = +(document.getElementById('invuln').value);
+    var fnpVal   = +(document.getElementById('fnp').value);
+    var W        = Math.max(1, +(document.getElementById('defWounds').value) || 1);
+    var unitSize = Math.max(1, +(document.getElementById('unitSize').value) || 1);
+    var cover    = document.getElementById('cover').checked;
+    var half     = document.getElementById('halfdmg').checked;
+    var minus1   = document.getElementById('dmgminus1').checked;
+    var minusHit   = document.getElementById('minusHit').checked;
+    var minusWound = document.getElementById('minusWound').checked;
+    var rrSave     = document.getElementById('rrSave').value;
+    var def = { T:T, sv2:sv2, inv:inv, fnpVal:fnpVal, W:W,
+                cover:cover, half:half, minus1:minus1,
+                minusHit:minusHit, minusWound:minusWound, rrSave:rrSave };
+
+    var i, combined = [1];
+    for (i = 0; i < atks.length; i++) combined = convolveDists(combined, buildKillDist(atks[i], def));
+
+    var rowCap = unitSize * 2;
+    var lastSig = 0;
+    for (i = 0; i < combined.length; i++) {
+      if ((combined[i] || 0) >= 0.001) lastSig = i;
+    }
+    var maxShow = Math.max(5, Math.min(lastSig, rowCap));
+
+    var maxProb = 0;
+    for (i = 0; i <= maxShow; i++) { if ((combined[i] || 0) > maxProb) maxProb = combined[i]; }
+    if (maxProb === 0) maxProb = 1;
+
+    var cumAtLeast = [], cs = 0;
+    for (i = combined.length - 1; i >= 0; i--) { cs += combined[i] || 0; cumAtLeast[i] = Math.min(1, cs); }
+
+    var html = '';
+    html += '<div style="display:grid;grid-template-columns:68px 1fr 58px 50px;gap:4px;margin-bottom:8px;padding:0 2px">';
+    html += '<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em">Kills</span>';
+    html += '<span></span>';
+    html += '<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em;text-align:right">&#8805; this</span>';
+    html += '<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em;text-align:right">Prob</span>';
+    html += '</div>';
+
+    for (i = 0; i <= maxShow; i++) {
+      var prob   = combined[i] || 0;
+      var pct    = prob * 100;
+      var cumPct = (cumAtLeast[i] || 0) * 100;
+      var barW   = (prob / maxProb) * 100;
+      var hue    = Math.round((prob / maxProb) * 120);
+      var barColor = 'hsl(' + hue + ',55%,38%)';
+      html += '<div style="display:grid;grid-template-columns:68px 1fr 58px 50px;gap:4px;align-items:center;margin-bottom:4px">';
+      html += '<span style="font-size:12px;color:var(--text-muted)">' + i + (i === 1 ? ' kill' : ' kills') + '</span>';
+      html += '<div style="background:var(--bg-input);border-radius:3px;height:16px;overflow:hidden">';
+      html += '<div style="width:' + barW.toFixed(1) + '%;height:100%;background:' + barColor + ';border-radius:3px"></div>';
+      html += '</div>';
+      html += '<span style="font-size:12px;color:var(--text);text-align:right">' + cumPct.toFixed(1) + '%</span>';
+      html += '<span style="font-size:12px;color:var(--text-muted);text-align:right">' + pct.toFixed(1) + '%</span>';
+      html += '</div>';
+    }
+    document.getElementById('dist-content').innerHTML = html;
   }
 
   atks.push(mkAtk());
