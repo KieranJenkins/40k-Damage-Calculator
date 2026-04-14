@@ -649,12 +649,11 @@
   function buildKillDist(atk, def) {
     var result = calcOne(atk, def);
     var A = Math.max(1, atk.a);
-    var pPerAtk = Math.max(0, Math.min(0.99, result.unsaved / A));
     var effD = effDmgAvg(atk.d, def.half, def.minus1, atk.rrd || 'none');
     var pFNP = def.fnpVal < 7 ? rp(def.fnpVal) : 0;
+    var pPerAtk = Math.max(0, Math.min(0.99, result.unsaved / A)) * (1 - pFNP);
     var W = def.W;
-    var effDAdj = pFNP === 0 ? effD : Math.min(effD * (1 - pFNP), W);
-    var wnpk = Math.max(1, Math.round(W / Math.max(0.01, effDAdj)));
+    var wnpk = Math.max(1, Math.round(W / Math.max(0.01, effD)));
     var pU = [], i, j;
     for (i = 0; i <= A; i++) pU[i] = 0;
     pU[0] = 1;
