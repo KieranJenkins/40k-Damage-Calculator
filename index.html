@@ -95,7 +95,6 @@
     <p>Warhammer 40,000 · 10th Edition</p>
   </div>
 
-  <!-- ATTACK CALCULATOR -->
   <div class="card">
     <div class="card-title" onclick="toggleAC()" style="cursor:pointer;justify-content:space-between;padding-right:0;margin-bottom:0;user-select:none">
       Attack Calculator
@@ -159,7 +158,6 @@
     </div>
   </div>
 
-  <!-- ATTACK DISTRIBUTION -->
   <div id="ac-dist-card" class="card" style="display:none">
     <div class="card-title" onclick="toggleACDist()" style="cursor:pointer;justify-content:space-between;padding-right:0;margin-bottom:0;user-select:none">
       Attack Distribution
@@ -176,7 +174,6 @@
     <span class="add-icon">+</span>Add Weapon Profile
   </div>
 
-  <!-- DEFENDER -->
   <div class="card">
     <div class="card-title">Defender</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px">
@@ -243,13 +240,11 @@
     </div>
   </div>
 
-  <!-- RESULTS -->
   <div class="res-card">
     <div class="res-title">Results</div>
     <div id="res-content"></div>
   </div>
 
-  <!-- DAMAGE DISTRIBUTION -->
   <div class="card" style="margin-top:12px">
     <div class="card-title" onclick="toggleDist()" style="cursor:pointer;justify-content:space-between;padding-right:0;margin-bottom:0;user-select:none">
       Damage Distribution
@@ -262,601 +257,457 @@
 </div>
 
 <script>
-  function toggleACDist() {
-    var body  = document.getElementById('ac-dist-body');
-    var arrow = document.getElementById('ac-dist-arrow');
-    if (body.style.display === 'none') {
-      body.style.display = 'block';
-      arrow.innerHTML = '&#9663;';
-    } else {
-      body.style.display = 'none';
-      arrow.innerHTML = '&#9657;';
-    }
-  }
-
+  /* ── Attack Calculator ─────────────────────────────────────────────── */
   function toggleAC() {
-    var body  = document.getElementById('ac-body');
-    var arrow = document.getElementById('ac-arrow');
-    if (body.style.display === 'none') {
-      body.style.display = 'block';
-      arrow.innerHTML = '&#9663;';
-    } else {
-      body.style.display = 'none';
-      arrow.innerHTML = '&#9657;';
-    }
+    var body=document.getElementById('ac-body'), arrow=document.getElementById('ac-arrow');
+    if (body.style.display==='none') { body.style.display='block'; arrow.innerHTML='&#9663;'; }
+    else { body.style.display='none'; arrow.innerHTML='&#9657;'; }
   }
-
+  function toggleACDist() {
+    var body=document.getElementById('ac-dist-body'), arrow=document.getElementById('ac-dist-arrow');
+    if (body.style.display==='none') { body.style.display='block'; arrow.innerHTML='&#9663;'; }
+    else { body.style.display='none'; arrow.innerHTML='&#9657;'; }
+  }
   function calcAC() {
-    var num = document.getElementById('ac-num').value;
-    var die = document.getElementById('ac-die').value;
-    var mod = document.getElementById('ac-mod').value;
-    var rr  = parseInt(document.getElementById('ac-rr').value) || 0;
-    var el  = document.getElementById('ac-result');
-    var distCard = document.getElementById('ac-dist-card');
-    if (!num || !die) {
-      el.innerHTML = '&#8212;';
-      el.style.color = 'var(--text-hint)';
-      document.getElementById('ac-p80').innerHTML = '&#8212;';
-      document.getElementById('ac-p80').style.color = 'var(--text-hint)';
-      distCard.style.display = 'none';
+    var num=document.getElementById('ac-num').value;
+    var die=document.getElementById('ac-die').value;
+    var mod=document.getElementById('ac-mod').value;
+    var rr=parseInt(document.getElementById('ac-rr').value)||0;
+    var el=document.getElementById('ac-result');
+    var p80el=document.getElementById('ac-p80');
+    var distCard=document.getElementById('ac-dist-card');
+    if (!num||!die) {
+      el.innerHTML='&#8212;'; el.style.color='var(--text-hint)';
+      p80el.innerHTML='&#8212;'; p80el.style.color='var(--text-hint)';
+      distCard.style.display='none';
     } else {
-      var n = parseInt(num);
-      var y = (die === 'd3') ? 3 : 6;
-      var m = mod ? parseInt(mod) : 0;
-      var baseAvg = (y + 1) / 2;
-      var rrAvg;
-      if (rr === 0) {
-        rrAvg = baseAvg;
-      } else {
-        var pRR = rr / y;
-        rrAvg = baseAvg + pRR * (baseAvg - (rr + 1) / 2);
-      }
-      var r = n * (rrAvg + m);
-      el.textContent = (r % 1 === 0) ? String(r) : r.toFixed(2);
-      el.style.color = 'var(--accent-light)';
-      renderACDist(n, die, m, rr);
-      distCard.style.display = 'block';
+      var n=parseInt(num), y=(die==='d3')?3:6, m=mod?parseInt(mod):0;
+      var baseAvg=(y+1)/2, rrAvg;
+      if (rr===0) { rrAvg=baseAvg; }
+      else { rrAvg=baseAvg+(rr/y)*(baseAvg-(rr+1)/2); }
+      var r=n*(rrAvg+m);
+      el.textContent=(r%1===0)?String(r):r.toFixed(2);
+      el.style.color='var(--accent-light)';
+      var dist=buildACDist(n,y,m,rr);
+      var cumAtLeast=[], cs=0, i;
+      for (i=dist.length-1;i>=0;i--) { cs+=(dist[i]||0); cumAtLeast[i]=Math.min(1,cs); }
+      var p80=0;
+      for (i=0;i<cumAtLeast.length;i++) { if ((cumAtLeast[i]||0)>=0.80) p80=i; else break; }
+      p80el.textContent=String(p80); p80el.style.color='var(--accent-light)';
+      renderACDist(dist);
+      distCard.style.display='block';
     }
   }
-
-  function renderACDist(n, die, m, rr) {
-    var y = (die === 'd3') ? 3 : 6;
-    var rrThresh = rr || 0;
-    var i, j, k;
-    var faceDist = [];
-    for (i = 0; i <= y + m; i++) faceDist[i] = 0;
-    if (rrThresh === 0) {
-      for (i = 1; i <= y; i++) faceDist[i + m] = 1 / y;
+  function buildACDist(n, y, m, rr) {
+    var i, j, k, faceDist=[], rrThresh=rr||0;
+    for (i=0;i<=y+m;i++) faceDist[i]=0;
+    if (rrThresh===0) {
+      for (i=1;i<=y;i++) faceDist[i+m]=1/y;
     } else {
-      var pRR = rrThresh / y;
-      var pKeep = 1 - pRR;
-      var rerollAvgIdx = 0;
-      for (i = 1; i <= y; i++) rerollAvgIdx += i / y;
-      for (i = 1; i <= y; i++) {
-        if (i <= rrThresh) {
-          for (j = 1; j <= y; j++) {
-            var idx = j + m;
-            if (idx < faceDist.length) faceDist[idx] += (1/y) * (1/y);
-            else { faceDist.push(0); faceDist[idx] += (1/y) * (1/y); }
-          }
-        } else {
-          faceDist[i + m] += 1 / y;
-        }
+      for (i=1;i<=y;i++) {
+        if (i<=rrThresh) { for (j=1;j<=y;j++) faceDist[j+m]+=(1/y)*(1/y); }
+        else { faceDist[i+m]+=1/y; }
       }
     }
-    var combined = [1];
-    for (i = 0; i < n; i++) {
-      var next = [];
-      for (j = 0; j < combined.length + faceDist.length - 1; j++) next[j] = 0;
-      for (j = 0; j < combined.length; j++) {
-        for (k = 0; k < faceDist.length; k++) {
-          if (faceDist[k]) next[j + k] += (combined[j] || 0) * faceDist[k];
-        }
-      }
-      combined = next;
+    var combined=[1];
+    for (k=0;k<n;k++) {
+      var next=[];
+      for (i=0;i<combined.length+faceDist.length-1;i++) next[i]=0;
+      for (i=0;i<combined.length;i++) { for (j=0;j<faceDist.length;j++) { if (faceDist[j]) next[i+j]+=(combined[i]||0)*faceDist[j]; } }
+      combined=next;
     }
-    var maxProb = 0;
-    for (i = 0; i < combined.length; i++) { if ((combined[i] || 0) > maxProb) maxProb = combined[i]; }
-    if (maxProb === 0) maxProb = 1;
-    var cumAtLeast = [], cs = 0;
-    for (i = combined.length - 1; i >= 0; i--) { cs += combined[i] || 0; cumAtLeast[i] = Math.min(1, cs); }
-    var p80val = 0;
-    for (i = 0; i < cumAtLeast.length; i++) { if (cumAtLeast[i] >= 0.80) p80val = i; else break; }
-    var p80el = document.getElementById('ac-p80');
-    p80el.textContent = String(p80val);
-    p80el.style.color = 'var(--accent-light)';
-    var html = '';
-    html += '<div style="display:grid;grid-template-columns:68px 1fr 58px;gap:4px;margin-bottom:8px;padding:0 2px">';
-    html += '<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em">Attacks</span>';
-    html += '<span></span>';
-    html += '<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em;text-align:right">&#8805; this</span>';
-    html += '</div>';
-    for (i = 0; i < combined.length; i++) {
-      var prob = combined[i] || 0;
-      if (prob < 0.0001) continue;
-      var cumPct = (cumAtLeast[i] || 0) * 100;
-      var barW   = (prob / maxProb) * 100;
-      var hue    = Math.round((prob / maxProb) * 120);
-      html += '<div style="display:grid;grid-template-columns:68px 1fr 58px;gap:4px;align-items:center;margin-bottom:4px">';
-      html += '<span style="font-size:12px;color:var(--text-muted)">' + i + ' atk' + (i !== 1 ? 's' : '') + '</span>';
-      html += '<div style="background:var(--bg-input);border-radius:3px;height:16px;overflow:hidden">';
-      html += '<div style="width:' + barW.toFixed(1) + '%;height:100%;background:hsl(' + hue + ',55%,38%);border-radius:3px"></div>';
-      html += '</div>';
-      html += '<span style="font-size:12px;color:var(--text);text-align:right">' + cumPct.toFixed(1) + '%</span>';
-      html += '</div>';
+    return combined;
+  }
+  function renderACDist(dist) {
+    var i, maxProb=0, cs=0;
+    for (i=0;i<dist.length;i++) { if ((dist[i]||0)>maxProb) maxProb=dist[i]; }
+    if (maxProb===0) maxProb=1;
+    var cumAtLeast=[];
+    for (i=dist.length-1;i>=0;i--) { cs+=(dist[i]||0); cumAtLeast[i]=Math.min(1,cs); }
+    var html='';
+    html+='<div style="display:grid;grid-template-columns:68px 1fr 58px;gap:4px;margin-bottom:8px;padding:0 2px">';
+    html+='<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em">Attacks</span>';
+    html+='<span></span>';
+    html+='<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em;text-align:right">&#8805; this</span>';
+    html+='</div>';
+    for (i=0;i<dist.length;i++) {
+      var prob=dist[i]||0;
+      if (prob<0.001) continue;
+      var cumPct=(cumAtLeast[i]||0)*100;
+      var barW=(prob/maxProb)*100;
+      var hue=Math.round((prob/maxProb)*120);
+      html+='<div style="display:grid;grid-template-columns:68px 1fr 58px;gap:4px;align-items:center;margin-bottom:4px">';
+      html+='<span style="font-size:12px;color:var(--text-muted)">'+i+' atk'+(i!==1?'s':'')+'</span>';
+      html+='<div style="background:var(--bg-input);border-radius:3px;height:16px;overflow:hidden">';
+      html+='<div style="width:'+barW.toFixed(1)+'%;height:100%;background:hsl('+hue+',55%,38%);border-radius:3px"></div>';
+      html+='</div>';
+      html+='<span style="font-size:12px;color:var(--text);text-align:right">'+cumPct.toFixed(1)+'%</span>';
+      html+='</div>';
     }
-    document.getElementById('ac-dist-content').innerHTML = html;
+    document.getElementById('ac-dist-content').innerHTML=html;
   }
 
-  var atks = [], uid = 1;
-
+  /* ── Weapon Profile State ──────────────────────────────────────────── */
+  var atks=[], uid=1;
   function mkAtk() {
-    return { id: uid++, a: 10, bs: 3, s: 4, ap: 0, d: '1',
-             torrent: false, lethal: false, sustained: false, sustainX: 1,
-             dev: false, ignoresCover: false, critX: 6,
-             rrh: 'none', rrw: 'none', rrd: 'none',
-             plusHit: false, plusWound: false, antiXVal: 'none' };
+    return { id:uid++, a:10, bs:3, s:4, ap:0, d:'1',
+             torrent:false, lethal:false, sustained:false, sustainX:1,
+             dev:false, ignoresCover:false, critX:6,
+             rrh:'none', rrw:'none', rrd:'none',
+             plusHit:false, plusWound:false, antiXVal:'none' };
   }
-
-  function mkOpt(val, label, selVal) {
-    return '<option value="' + val + '"' + (String(selVal) === String(val) ? ' selected' : '') + '>' + label + '</option>';
+  function mkOpt(val,label,selVal) {
+    return '<option value="'+val+'"'+(String(selVal)===String(val)?' selected':'')+'>'+label+'</option>';
   }
-
   function dmgOpts(sel) {
-    var s = String(sel), o = '', i;
-    for (i = 1; i <= 12; i++) o += mkOpt(i, i, s);
-    o += '<optgroup label="d3">' + mkOpt('d3', 'd3', s);
-    for (i = 1; i <= 6; i++) o += mkOpt('d3+'+i, 'd3+'+i, s);
-    o += '</optgroup><optgroup label="d6">' + mkOpt('d6', 'd6', s);
-    for (i = 1; i <= 6; i++) o += mkOpt('d6+'+i, 'd6+'+i, s);
-    return o + '</optgroup>';
+    var s=String(sel), o='', i;
+    for (i=1;i<=12;i++) o+=mkOpt(i,i,s);
+    o+='<optgroup label="d3">'+mkOpt('d3','d3',s);
+    for (i=1;i<=6;i++) o+=mkOpt('d3+'+i,'d3+'+i,s);
+    o+='</optgroup><optgroup label="d6">'+mkOpt('d6','d6',s);
+    for (i=1;i<=6;i++) o+=mkOpt('d6+'+i,'d6+'+i,s);
+    return o+'</optgroup>';
   }
-
-  function cbCls(on) { return 'cb' + (on ? ' ticked' : ''); }
-
+  function cbCls(on) { return 'cb'+(on?' ticked':''); }
   function cardHTML(atk, showDel, idx) {
-    var id = atk.id;
-    var i, bsOpts = '', apOpts = '', cxOpts = '', axOpts = '', sxOpts = '';
-    var rrhOpts = '', rrwOpts = '', rrdOpts = '';
-    var bsVals = [2,3,4,5,6];
-    for (i = 0; i < bsVals.length; i++) bsOpts += mkOpt(bsVals[i], bsVals[i]+'+', atk.bs);
-    var apVals = [0,-1,-2,-3,-4,-5,-6];
-    for (i = 0; i < apVals.length; i++) apOpts += mkOpt(apVals[i], apVals[i], atk.ap);
-    var cxVals = [6,5,4,3,2];
-    for (i = 0; i < cxVals.length; i++) cxOpts += mkOpt(cxVals[i], cxVals[i]+'+', atk.critX || 6);
-    axOpts = mkOpt('none', 'None', atk.antiXVal);
-    var axVals = [6,5,4,3,2];
-    for (i = 0; i < axVals.length; i++) axOpts += mkOpt(axVals[i], axVals[i]+'+', atk.antiXVal);
-    for (i = 1; i <= 6; i++) sxOpts += mkOpt(i, i, atk.sustainX || 1);
-    var rrhPairs = [['none','None'],['ones','Re-roll 1s'],['all','Re-roll all fails'],['crits','Fish for Crits']];
-    for (i = 0; i < rrhPairs.length; i++) rrhOpts += mkOpt(rrhPairs[i][0], rrhPairs[i][1], atk.rrh);
-    var rrwPairs = [['none','None'],['ones','Re-roll 1s'],['all','Re-roll all fails'],['crits','Fish for Crits']];
-    for (i = 0; i < rrwPairs.length; i++) rrwOpts += mkOpt(rrwPairs[i][0], rrwPairs[i][1], atk.rrw);
-    var rrdPairs = [['none','None'],['ones','Re-roll 1s'],['twos','Re-roll 2s'],['threes','Re-roll 3s']];
-    for (i = 0; i < rrdPairs.length; i++) rrdOpts += mkOpt(rrdPairs[i][0], rrdPairs[i][1], atk.rrd || 'none');
-
-    var h = '';
-    h += '<div class="card" data-atk="' + id + '">';
-    h += showDel ? '<button class="del-btn" onclick="delAtk(' + id + ')" title="Remove">&#215;</button>' : '';
-    h += '<div class="card-title"><span class="atk-num">' + idx + '</span>Weapon Profile</div>';
-    h += '<div class="row3">';
-    h +=   '<div class="field"><label>Attacks</label>';
-    h +=     '<input type="number" value="' + atk.a + '" min="1" max="100" oninput="setAtk(' + id + ',\'a\',+this.value)"></div>';
-    h +=   '<div class="field"><label>BS / WS</label>';
-    h +=     '<select onchange="setAtk(' + id + ',\'bs\',+this.value)">' + bsOpts + '</select></div>';
-    h +=   '<div class="field"><label>Strength</label>';
-    h +=     '<input type="number" value="' + atk.s + '" min="1" max="24" oninput="setAtk(' + id + ',\'s\',+this.value)"></div>';
-    h += '</div>';
-    h += '<div class="row2">';
-    h +=   '<div class="field"><label>AP</label>';
-    h +=     '<select onchange="setAtk(' + id + ',\'ap\',+this.value)">' + apOpts + '</select></div>';
-    h +=   '<div class="field"><label>Damage</label>';
-    h +=     '<select onchange="setAtk(' + id + ',\'d\',this.value)">' + dmgOpts(atk.d) + '</select></div>';
-    h += '</div>';
-    h += '<div class="cb-grid">';
-    h +=   '<label class="' + cbCls(atk.plusHit) + '" id="lbl-ph' + id + '">';
-    h +=     '<input type="checkbox"' + (atk.plusHit ? ' checked' : '') + ' onchange="setCb(' + id + ',\'plusHit\',this.checked,\'lbl-ph' + id + '\')"> +1 to Hit</label>';
-    h +=   '<label class="' + cbCls(atk.plusWound) + '" id="lbl-pw' + id + '">';
-    h +=     '<input type="checkbox"' + (atk.plusWound ? ' checked' : '') + ' onchange="setCb(' + id + ',\'plusWound\',this.checked,\'lbl-pw' + id + '\')"> +1 to Wound</label>';
-    h +=   '<label class="' + cbCls(atk.lethal) + '" id="lbl-let' + id + '">';
-    h +=     '<input type="checkbox"' + (atk.lethal ? ' checked' : '') + ' onchange="setCb(' + id + ',\'lethal\',this.checked,\'lbl-let' + id + '\')"> Lethal Hits</label>';
-    h +=   '<div class="cb-sus ' + (atk.sustained ? 'ticked' : '') + '" id="lbl-sus' + id + '">';
-    h +=     '<input type="checkbox" id="chk-sus' + id + '"' + (atk.sustained ? ' checked' : '') + ' onchange="toggleSustained(' + id + ',this.checked)">';
-    h +=     '<span class="sus-lbl" onclick="document.getElementById(\'chk-sus' + id + '\').click()">Sustained Hits</span>';
-    h +=     '<select id="ssx' + id + '" onchange="setAtk(' + id + ',\'sustainX\',+this.value);event.stopPropagation()" style="display:' + (atk.sustained ? 'inline-block' : 'none') + '">' + sxOpts + '</select>';
-    h +=   '</div>';
-    h +=   '<label class="' + cbCls(atk.torrent) + '" id="lbl-tor' + id + '">';
-    h +=     '<input type="checkbox"' + (atk.torrent ? ' checked' : '') + ' onchange="setCb(' + id + ',\'torrent\',this.checked,\'lbl-tor' + id + '\')"> Torrent</label>';
-    h +=   '<label class="' + cbCls(atk.ignoresCover) + '" id="lbl-ic' + id + '">';
-    h +=     '<input type="checkbox"' + (atk.ignoresCover ? ' checked' : '') + ' onchange="setCb(' + id + ',\'ignoresCover\',this.checked,\'lbl-ic' + id + '\')"> Ignores Cover</label>';
-    h +=   '<label class="' + cbCls(atk.dev) + '" id="lbl-dev' + id + '">';
-    h +=     '<input type="checkbox"' + (atk.dev ? ' checked' : '') + ' onchange="setCb(' + id + ',\'dev\',this.checked,\'lbl-dev' + id + '\')"> Dev. Wounds</label>';
-    h +=   '<div></div>';
-    h += '</div>';
-    h += '<div class="row3">';
-    h +=   '<div class="field"><label>Re-roll hits</label>';
-    h +=     '<select onchange="setAtk(' + id + ',\'rrh\',this.value)">' + rrhOpts + '</select></div>';
-    h +=   '<div class="field"><label>Re-roll wounds</label>';
-    h +=     '<select onchange="setAtk(' + id + ',\'rrw\',this.value)">' + rrwOpts + '</select></div>';
-    h +=   '<div class="field"><label>Re-roll damage</label>';
-    h +=     '<select onchange="setAtk(' + id + ',\'rrd\',this.value)">' + rrdOpts + '</select></div>';
-    h += '</div>';
-    h += '<div class="row2" style="margin-bottom:0">';
-    h +=   '<div class="field"><label>Crit Hits X+</label>';
-    h +=     '<select onchange="setAtk(' + id + ',\'critX\',+this.value)">' + cxOpts + '</select></div>';
-    h +=   '<div class="field"><label>Anti-X</label>';
-    h +=     '<select onchange="setAtk(' + id + ',\'antiXVal\',this.value)">' + axOpts + '</select></div>';
-    h += '</div>';
-    h += '</div>';
+    var id=atk.id, i, bsOpts='', apOpts='', cxOpts='', axOpts='', sxOpts='', rrhOpts='', rrwOpts='', rrdOpts='';
+    var bsVals=[2,3,4,5,6]; for (i=0;i<bsVals.length;i++) bsOpts+=mkOpt(bsVals[i],bsVals[i]+'+',atk.bs);
+    var apVals=[0,-1,-2,-3,-4,-5,-6]; for (i=0;i<apVals.length;i++) apOpts+=mkOpt(apVals[i],apVals[i],atk.ap);
+    var cxVals=[6,5,4,3,2]; for (i=0;i<cxVals.length;i++) cxOpts+=mkOpt(cxVals[i],cxVals[i]+'+',(atk.critX||6));
+    axOpts=mkOpt('none','None',atk.antiXVal);
+    var axVals=[6,5,4,3,2]; for (i=0;i<axVals.length;i++) axOpts+=mkOpt(axVals[i],axVals[i]+'+',atk.antiXVal);
+    for (i=1;i<=6;i++) sxOpts+=mkOpt(i,i,(atk.sustainX||1));
+    var rrhP=[['none','None'],['ones','Re-roll 1s'],['all','Re-roll all fails'],['crits','Fish for Crits']];
+    for (i=0;i<rrhP.length;i++) rrhOpts+=mkOpt(rrhP[i][0],rrhP[i][1],atk.rrh);
+    var rrwP=[['none','None'],['ones','Re-roll 1s'],['all','Re-roll all fails'],['crits','Fish for Crits']];
+    for (i=0;i<rrwP.length;i++) rrwOpts+=mkOpt(rrwP[i][0],rrwP[i][1],atk.rrw);
+    var rrdP=[['none','None'],['ones','Re-roll 1s'],['twos','Re-roll 2s'],['threes','Re-roll 3s']];
+    for (i=0;i<rrdP.length;i++) rrdOpts+=mkOpt(rrdP[i][0],rrdP[i][1],(atk.rrd||'none'));
+    var h='';
+    h+='<div class="card" data-atk="'+id+'">';
+    h+=showDel?'<button class="del-btn" onclick="delAtk('+id+')" title="Remove">&#215;</button>':'';
+    h+='<div class="card-title"><span class="atk-num">'+idx+'</span>Weapon Profile</div>';
+    h+='<div class="row3">';
+    h+='<div class="field"><label>Attacks</label><input type="number" value="'+atk.a+'" min="1" max="100" oninput="setAtk('+id+',\'a\',+this.value)"></div>';
+    h+='<div class="field"><label>BS / WS</label><select onchange="setAtk('+id+',\'bs\',+this.value)">'+bsOpts+'</select></div>';
+    h+='<div class="field"><label>Strength</label><input type="number" value="'+atk.s+'" min="1" max="24" oninput="setAtk('+id+',\'s\',+this.value)"></div>';
+    h+='</div>';
+    h+='<div class="row2">';
+    h+='<div class="field"><label>AP</label><select onchange="setAtk('+id+',\'ap\',+this.value)">'+apOpts+'</select></div>';
+    h+='<div class="field"><label>Damage</label><select onchange="setAtk('+id+',\'d\',this.value)">'+dmgOpts(atk.d)+'</select></div>';
+    h+='</div>';
+    h+='<div class="cb-grid">';
+    h+='<label class="'+cbCls(atk.plusHit)+'" id="lbl-ph'+id+'"><input type="checkbox"'+(atk.plusHit?' checked':'')+' onchange="setCb('+id+',\'plusHit\',this.checked,\'lbl-ph'+id+'\')"> +1 to Hit</label>';
+    h+='<label class="'+cbCls(atk.plusWound)+'" id="lbl-pw'+id+'"><input type="checkbox"'+(atk.plusWound?' checked':'')+' onchange="setCb('+id+',\'plusWound\',this.checked,\'lbl-pw'+id+'\')"> +1 to Wound</label>';
+    h+='<label class="'+cbCls(atk.lethal)+'" id="lbl-let'+id+'"><input type="checkbox"'+(atk.lethal?' checked':'')+' onchange="setCb('+id+',\'lethal\',this.checked,\'lbl-let'+id+'\')"> Lethal Hits</label>';
+    h+='<div class="cb-sus '+(atk.sustained?'ticked':'')+'" id="lbl-sus'+id+'">';
+    h+='<input type="checkbox" id="chk-sus'+id+'"'+(atk.sustained?' checked':'')+' onchange="toggleSustained('+id+',this.checked)">';
+    h+='<span class="sus-lbl" onclick="document.getElementById(\'chk-sus'+id+'\').click()">Sustained Hits</span>';
+    h+='<select id="ssx'+id+'" onchange="setAtk('+id+',\'sustainX\',+this.value);event.stopPropagation()" style="display:'+(atk.sustained?'inline-block':'none')+'">'+sxOpts+'</select>';
+    h+='</div>';
+    h+='<label class="'+cbCls(atk.torrent)+'" id="lbl-tor'+id+'"><input type="checkbox"'+(atk.torrent?' checked':'')+' onchange="setCb('+id+',\'torrent\',this.checked,\'lbl-tor'+id+'\')"> Torrent</label>';
+    h+='<label class="'+cbCls(atk.ignoresCover)+'" id="lbl-ic'+id+'"><input type="checkbox"'+(atk.ignoresCover?' checked':'')+' onchange="setCb('+id+',\'ignoresCover\',this.checked,\'lbl-ic'+id+'\')"> Ignores Cover</label>';
+    h+='<label class="'+cbCls(atk.dev)+'" id="lbl-dev'+id+'"><input type="checkbox"'+(atk.dev?' checked':'')+' onchange="setCb('+id+',\'dev\',this.checked,\'lbl-dev'+id+'\')"> Dev. Wounds</label>';
+    h+='<div></div>';
+    h+='</div>';
+    h+='<div class="row3">';
+    h+='<div class="field"><label>Re-roll hits</label><select onchange="setAtk('+id+',\'rrh\',this.value)">'+rrhOpts+'</select></div>';
+    h+='<div class="field"><label>Re-roll wounds</label><select onchange="setAtk('+id+',\'rrw\',this.value)">'+rrwOpts+'</select></div>';
+    h+='<div class="field"><label>Re-roll damage</label><select onchange="setAtk('+id+',\'rrd\',this.value)">'+rrdOpts+'</select></div>';
+    h+='</div>';
+    h+='<div class="row2" style="margin-bottom:0">';
+    h+='<div class="field"><label>Crit Hits X+</label><select onchange="setAtk('+id+',\'critX\',+this.value)">'+cxOpts+'</select></div>';
+    h+='<div class="field"><label>Anti-X</label><select onchange="setAtk('+id+',\'antiXVal\',this.value)">'+axOpts+'</select></div>';
+    h+='</div>';
+    h+='</div>';
     return h;
   }
-
   function render() {
-    var showDel = atks.length > 1;
-    var html = '', i;
-    for (i = 0; i < atks.length; i++) html += cardHTML(atks[i], showDel, i + 1);
-    document.getElementById('atk-container').innerHTML = html;
+    var showDel=atks.length>1, html='', i;
+    for (i=0;i<atks.length;i++) html+=cardHTML(atks[i],showDel,i+1);
+    document.getElementById('atk-container').innerHTML=html;
+  }
+  function addAtk() { atks.push(mkAtk()); render(); calc(); }
+  function delAtk(id) { if (atks.length<=1) return; var i; for (i=0;i<atks.length;i++) { if (atks[i].id===id) { atks.splice(i,1); break; } } render(); calc(); }
+  function setAtk(id,k,v) { var i; for (i=0;i<atks.length;i++) { if (atks[i].id===id) { atks[i][k]=v; calc(); break; } } }
+  function setCb(id,k,v,l) { var i; for (i=0;i<atks.length;i++) { if (atks[i].id===id) { atks[i][k]=v; document.getElementById(l).classList.toggle('ticked',v); calc(); break; } } }
+  function syncLbl(cbId,lblId) { document.getElementById(lblId).classList.toggle('ticked',document.getElementById(cbId).checked); }
+  function toggleSustained(id,v) {
+    var i, a=null; for (i=0;i<atks.length;i++) { if (atks[i].id===id) { a=atks[i]; break; } } if (!a) return;
+    a.sustained=v; document.getElementById('lbl-sus'+id).classList.toggle('ticked',v);
+    var s=document.getElementById('ssx'+id); if (s) s.style.display=v?'inline-block':'none'; calc();
   }
 
-  function addAtk()        { atks.push(mkAtk()); render(); calc(); }
-  function delAtk(id)      { if (atks.length <= 1) return; var i; for (i = 0; i < atks.length; i++) { if (atks[i].id === id) { atks.splice(i, 1); break; } } render(); calc(); }
-  function setAtk(id,k,v)  { var i; for (i = 0; i < atks.length; i++) { if (atks[i].id === id) { atks[i][k] = v; calc(); break; } } }
-  function setCb(id,k,v,l) { var i; for (i = 0; i < atks.length; i++) { if (atks[i].id === id) { atks[i][k] = v; document.getElementById(l).classList.toggle('ticked', v); calc(); break; } } }
-  function syncLbl(cbId, lblId) { document.getElementById(lblId).classList.toggle('ticked', document.getElementById(cbId).checked); }
-  function toggleSustained(id, v) {
-    var i, a = null;
-    for (i = 0; i < atks.length; i++) { if (atks[i].id === id) { a = atks[i]; break; } }
-    if (!a) return;
-    a.sustained = v;
-    document.getElementById('lbl-sus' + id).classList.toggle('ticked', v);
-    var s = document.getElementById('ssx' + id);
-    if (s) s.style.display = v ? 'inline-block' : 'none';
-    calc();
-  }
-
-  function rp(t) { return Math.max(0, Math.min(1, (7 - t) / 6)); }
-
-  function wt(s, t) {
-    if (s >= 2 * t) return 2;
-    if (s > t)      return 3;
-    if (s === t)    return 4;
-    if (t >= 2 * s) return 6;
-    return 5;
-  }
+  /* ── Core Maths ────────────────────────────────────────────────────── */
+  function rp(t) { return Math.max(0,Math.min(1,(7-t)/6)); }
+  function wt(s,t) { if (s>=2*t) return 2; if (s>t) return 3; if (s===t) return 4; if (t>=2*s) return 6; return 5; }
 
   function effDmgAvg(dStr, half, minus1, rrd) {
-    var s = String(dStr).trim().toLowerCase();
-    var rrThresh = 0;
-    if (rrd === 'ones')   rrThresh = 1;
-    if (rrd === 'twos')   rrThresh = 2;
-    if (rrd === 'threes') rrThresh = 3;
+    var s=String(dStr).trim().toLowerCase();
+    var rrT=0; if (rrd==='ones') rrT=1; if (rrd==='twos') rrT=2; if (rrd==='threes') rrT=3;
     if (/^\d+$/.test(s)) {
-      var fv = parseInt(s);
-      if (half)   fv = Math.max(1, Math.floor(fv / 2));
-      if (minus1) fv = Math.max(1, fv - 1);
-      return Math.max(1, fv);
+      var fv=parseInt(s); if (half) fv=Math.max(1,Math.floor(fv/2)); if (minus1) fv=Math.max(1,fv-1); return Math.max(1,fv);
     }
-    var m = s.match(/^(\d+)?d(\d+)(?:\+(\d+))?$/);
-    if (!m) return 1;
-    var x = parseInt(m[1]) || 1;
-    var y = parseInt(m[2]);
-    var z = m[3] ? parseInt(m[3]) : 0;
-    var i, v, vals = [], sum = 0;
-    for (i = 1; i <= y; i++) {
-      v = x * i + z;
-      if (half)   v = Math.floor(v / 2);
-      if (minus1) v = v - 1;
-      v = Math.max(1, v);
-      vals.push(v);
-      sum += v;
+    var m=s.match(/^(\d+)?d(\d+)(?:\+(\d+))?$/); if (!m) return 1;
+    var x=parseInt(m[1])||1, y=parseInt(m[2]), z=m[3]?parseInt(m[3]):0;
+    var i, v, vals=[], sum=0;
+    for (i=1;i<=y;i++) { v=x*i+z; if (half) v=Math.floor(v/2); if (minus1) v=v-1; v=Math.max(1,v); vals.push(v); sum+=v; }
+    if (rrT===0) return sum/y;
+    var avgAll=sum/y, wSum=0;
+    for (i=0;i<y;i++) wSum+=(i+1<=rrT)?avgAll:vals[i];
+    return wSum/y;
+  }
+
+  /* Build exact per-wound damage distribution for the distribution chart */
+  function dmgFaceDist(dStr, half, minus1, rrd) {
+    var s=String(dStr).trim().toLowerCase();
+    var rrT=0; if (rrd==='ones') rrT=1; if (rrd==='twos') rrT=2; if (rrd==='threes') rrT=3;
+    function mod(v) { if (half) v=Math.floor(v/2); if (minus1) v=v-1; return Math.max(1,v); }
+    var i, j, dist;
+    if (/^\d+$/.test(s)) {
+      var fv=mod(parseInt(s)); dist=[]; for (i=0;i<=fv;i++) dist[i]=0; dist[fv]=1; return dist;
     }
-    if (rrThresh === 0) { return sum / y; }
-    var avgAll = sum / y;
-    var wSum = 0;
-    for (i = 0; i < y; i++) {
-      wSum += (i + 1 <= rrThresh) ? avgAll : vals[i];
+    var m=s.match(/^(\d+)?d(\d+)(?:\+(\d+))?$/); if (!m) { return [0,1]; }
+    var x=parseInt(m[1])||1, y=parseInt(m[2]), z=m[3]?parseInt(m[3]):0;
+    /* collect possible raw values and their probabilities */
+    var raw={};
+    for (i=1;i<=y;i++) {
+      var rv=x*i+z;
+      if (i<=rrT) { for (j=1;j<=y;j++) { var rv2=x*j+z; raw[rv2]=(raw[rv2]||0)+(1/y)*(1/y); } }
+      else { raw[rv]=(raw[rv]||0)+(1/y); }
     }
-    return wSum / y;
+    var maxV=0, key;
+    for (key in raw) { var mv=mod(parseInt(key)); if (mv>maxV) maxV=mv; }
+    dist=[]; for (i=0;i<=maxV;i++) dist[i]=0;
+    for (key in raw) { var mv=mod(parseInt(key)); dist[mv]=(dist[mv]||0)+raw[key]; }
+    return dist;
+  }
+
+  function convolveDists(a, b) {
+    var len=a.length+b.length-1, res=[], i, j;
+    for (i=0;i<len;i++) res[i]=0;
+    for (i=0;i<a.length;i++) { if (!(a[i]>0)) continue; for (j=0;j<b.length;j++) { if (b[j]>0) res[i+j]+=a[i]*b[j]; } }
+    return res;
   }
 
   function calcOne(atk, def) {
-    var bs = atk.bs, S = atk.s, ap = atk.ap, dStr = atk.d;
-    var torrent = atk.torrent, lethal = atk.lethal, sustained = atk.sustained;
-    var dev = atk.dev, ignoresCover = atk.ignoresCover;
-    var rrh = atk.rrh, rrw = atk.rrw;
-    var sustainX = atk.sustainX || 1;
-    var critX = Math.max(2, Math.min(6, +(atk.critX) || 6));
-    var A = atk.a;
-    var T = def.T, sv2 = def.sv2, inv = def.inv, fnpVal = def.fnpVal, W = def.W;
-    var cover = def.cover, half = def.half, minus1 = def.minus1;
-    var minusHit = def.minusHit, minusWound = def.minusWound, rrSave = def.rrSave;
-    var effD = effDmgAvg(dStr, half, minus1, atk.rrd || 'none');
-    var pCritNat = rp(critX);
-    var pCrit, pHit;
-    if (torrent) {
-      pCrit = 0; pHit = 1;
-    } else {
-      var effBs = Math.min(6, Math.max(2, bs - (atk.plusHit ? 1 : 0) + (minusHit ? 1 : 0)));
-      var pHitMod = rp(effBs);
-      var pHitBase = Math.max(pHitMod, pCritNat);
-      pCrit = pCritNat; pHit = pHitBase;
-      if (rrh === 'ones') {
-        pCrit = Math.min(1, pCrit + (1/6) * pCrit);
-        pHit  = Math.min(1, pHit  + (1/6) * pHitBase);
-        pCrit = Math.min(pCrit, pHit);
-      } else if (rrh === 'all') {
-        var pMissH = 1 - pHitBase;
-        pCrit = Math.min(1, pCrit + pMissH * pCritNat);
-        pHit  = Math.min(1, pHitBase + pMissH * pHitBase);
-        pCrit = Math.min(pCrit, pHit);
-      } else if (rrh === 'crits') {
-        var pNonCrit = 1 - pCritNat;
-        pCrit = pCritNat + pNonCrit * pCritNat;
-        pHit  = pCrit + pNonCrit * Math.max(0, pHitBase - pCritNat);
-      }
+    var bs=atk.bs, S=atk.s, ap=atk.ap, dStr=atk.d;
+    var torrent=atk.torrent, lethal=atk.lethal, sustained=atk.sustained, dev=atk.dev, ignoresCover=atk.ignoresCover;
+    var rrh=atk.rrh, rrw=atk.rrw, sustainX=atk.sustainX||1;
+    var critX=Math.max(2,Math.min(6,+(atk.critX)||6)), A=atk.a;
+    var T=def.T, sv2=def.sv2, inv=def.inv, fnpVal=def.fnpVal, W=def.W;
+    var cover=def.cover, half=def.half, minus1=def.minus1, minusHit=def.minusHit, minusWound=def.minusWound, rrSave=def.rrSave;
+    var effD=effDmgAvg(dStr,half,minus1,atk.rrd||'none');
+    var pCritNat=rp(critX), pCrit, pHit;
+    if (torrent) { pCrit=0; pHit=1; }
+    else {
+      var effBs=Math.min(6,Math.max(2,bs-(atk.plusHit?1:0)+(minusHit?1:0)));
+      var pHitBase=Math.max(rp(effBs),pCritNat);
+      pCrit=pCritNat; pHit=pHitBase;
+      if (rrh==='ones') { pCrit=Math.min(1,pCrit+(1/6)*pCrit); pHit=Math.min(1,pHit+(1/6)*pHitBase); pCrit=Math.min(pCrit,pHit); }
+      else if (rrh==='all') { var pMH=1-pHitBase; pCrit=Math.min(1,pCrit+pMH*pCritNat); pHit=Math.min(1,pHitBase+pMH*pHitBase); pCrit=Math.min(pCrit,pHit); }
+      else if (rrh==='crits') { var pNC=1-pCritNat; pCrit=pCritNat+pNC*pCritNat; pHit=pCrit+pNC*Math.max(0,pHitBase-pCritNat); }
     }
-    var cH = A * pCrit;
-    var nH = A * Math.max(0, pHit - pCrit);
-    if (sustained) nH += cH * sustainX;
-    var totH = cH + nH;
-    var wTgt = wt(S, T);
-    var effWnd = Math.min(6, Math.max(2, wTgt - (atk.plusWound ? 1 : 0) + (minusWound ? 1 : 0)));
-    var woundCritMin = 6;
-    var axNum = parseInt(atk.antiXVal, 10);
-    if (!isNaN(axNum)) {
-      var ax = Math.max(2, Math.min(6, axNum));
-      effWnd = Math.min(effWnd, ax);
-      woundCritMin = ax;
-    }
-    var bw = rp(effWnd);
-    var pCW = Math.min(rp(woundCritMin), bw);
-    var pNW = Math.max(0, bw - pCW);
-    if (rrw === 'ones') {
-      pCW = Math.min(1, pCW * (7/6));
-      pNW = Math.min(1 - pCW, pNW * (7/6));
-    } else if (rrw === 'all') {
-      var pMissW = 1 - bw;
-      pCW = Math.min(1, pCW + pMissW * pCW);
-      pNW = Math.min(1 - pCW, pNW + pMissW * pNW);
-    } else if (rrw === 'crits') {
-      var pCW0 = pCW, pNW0 = Math.max(0, bw - pCW0), pNonCW = 1 - pCW0;
-      pCW = pCW0 + pNonCW * pCW0;
-      pNW = pNonCW * pNW0;
-    }
+    var cH=A*pCrit, nH=A*Math.max(0,pHit-pCrit);
+    if (sustained) nH+=cH*sustainX;
+    var totH=cH+nH;
+    var wTgt=wt(S,T), effWnd=Math.min(6,Math.max(2,wTgt-(atk.plusWound?1:0)+(minusWound?1:0))), wCritMin=6;
+    var axNum=parseInt(atk.antiXVal,10);
+    if (!isNaN(axNum)) { var ax=Math.max(2,Math.min(6,axNum)); effWnd=Math.min(effWnd,ax); wCritMin=ax; }
+    var bw=rp(effWnd), pCW=Math.min(rp(wCritMin),bw), pNW=Math.max(0,bw-pCW);
+    if (rrw==='ones') { pCW=Math.min(1,pCW*(7/6)); pNW=Math.min(1-pCW,pNW*(7/6)); }
+    else if (rrw==='all') { var pMW=1-bw; pCW=Math.min(1,pCW+pMW*pCW); pNW=Math.min(1-pCW,pNW+pMW*pNW); }
+    else if (rrw==='crits') { var pCW0=pCW, pNW0=Math.max(0,bw-pCW0), pNCW=1-pCW0; pCW=pCW0+pNCW*pCW0; pNW=pNCW*pNW0; }
     var cW, nW;
-    if (lethal) { cW = nH * pCW; nW = cH + nH * pNW; }
-    else        { cW = totH * pCW; nW = totH * pNW; }
-    var totW = cW + nW;
-    var effectiveCover = cover && !ignoresCover;
-    var coverSupp = effectiveCover && ap === 0 && sv2 <= 3;
-    var aSv = sv2 - ap;
-    if (effectiveCover && !coverSupp) aSv = Math.max(2, aSv - 1);
-    var effSv = Math.min(aSv, inv);
-    var pSave = rp(effSv);
-    if (rrSave === 'ones') pSave = Math.min(1, pSave * (7/6));
-    if (rrSave === 'all')  pSave = Math.min(1, pSave + (1 - pSave) * pSave);
-    var pFail = 1 - pSave;
-    var unsaved = dev ? (cW + nW * pFail) : totW * pFail;
-    var pFNP = fnpVal < 7 ? rp(fnpVal) : 0;
-    var totDmg = unsaved * effD * (1 - pFNP);
-    var kills = pFNP === 0
-      ? unsaved / Math.ceil(W / effD)
-      : unsaved * Math.min(effD * (1 - pFNP), W) / W;
-    return { totH: totH, totW: totW, unsaved: unsaved, totDmg: totDmg, kills: kills,
-             effWnd: effWnd, effSv: effSv, pFail: pFail, pFNP: pFNP };
+    if (lethal) { cW=nH*pCW; nW=cH+nH*pNW; } else { cW=totH*pCW; nW=totH*pNW; }
+    var totW=cW+nW;
+    var effCover=cover&&!ignoresCover, covSupp=effCover&&ap===0&&sv2<=3;
+    var aSv=sv2-ap; if (effCover&&!covSupp) aSv=Math.max(2,aSv-1);
+    var effSv=Math.min(aSv,inv), pSave=rp(effSv);
+    if (rrSave==='ones') pSave=Math.min(1,pSave*(7/6));
+    if (rrSave==='all')  pSave=Math.min(1,pSave+(1-pSave)*pSave);
+    var pFail=1-pSave;
+    var unsaved=dev?(cW+nW*pFail):totW*pFail;
+    var pFNP=fnpVal<7?rp(fnpVal):0;
+    var totDmg=unsaved*effD*(1-pFNP);
+    var kills=pFNP===0?unsaved/Math.ceil(W/effD):unsaved*Math.min(effD*(1-pFNP),W)/W;
+    return { totH:totH, totW:totW, unsaved:unsaved, totDmg:totDmg, kills:kills, effWnd:effWnd, effSv:effSv, pFail:pFail, pFNP:pFNP };
   }
 
+  /* Build kill distribution (multi-model) */
   function buildKillDist(atk, def) {
-    var result = calcOne(atk, def);
-    var A = Math.max(1, atk.a);
-    var effD = effDmgAvg(atk.d, def.half, def.minus1, atk.rrd || 'none');
-    var pFNP = def.fnpVal < 7 ? rp(def.fnpVal) : 0;
-    var pPerAtk = Math.max(0, Math.min(0.99, result.unsaved / A)) * (1 - pFNP);
-    var W = def.W;
-    var wnpk = Math.max(1, Math.round(W / Math.max(0.01, effD)));
-    var pU = [], i, j;
-    for (i = 0; i <= A; i++) pU[i] = 0;
-    pU[0] = 1;
-    for (i = 0; i < A; i++) {
-      var next = [];
-      for (j = 0; j <= i + 1; j++) next[j] = 0;
-      for (j = 0; j <= i; j++) {
-        next[j]   += pU[j] * (1 - pPerAtk);
-        next[j+1] += pU[j] * pPerAtk;
-      }
-      pU = next;
+    var result=calcOne(atk,def), A=Math.max(1,atk.a);
+    var pFNP=def.fnpVal<7?rp(def.fnpVal):0;
+    var pPerAtk=Math.max(0,Math.min(0.99,result.unsaved/A))*(1-pFNP);
+    var effD=effDmgAvg(atk.d,def.half,def.minus1,atk.rrd||'none');
+    var W=def.W, wnpk=Math.max(1,Math.round(W/Math.max(0.01,effD)));
+    var pU=[1], i, j;
+    for (i=0;i<A;i++) {
+      var next=[]; for (j=0;j<=i+1;j++) next[j]=0;
+      for (j=0;j<=i;j++) { next[j]+=pU[j]*(1-pPerAtk); next[j+1]+=pU[j]*pPerAtk; }
+      pU=next;
     }
-    var maxKills = Math.ceil(A / wnpk);
-    var pK = [];
-    for (i = 0; i <= maxKills; i++) pK[i] = 0;
-    for (var k = 0; k <= A; k++) {
-      var kills = Math.min(maxKills, Math.floor(k / wnpk));
-      pK[kills] += pU[k];
-    }
+    var maxKills=Math.ceil(A/wnpk), pK=[], k;
+    for (i=0;i<=maxKills;i++) pK[i]=0;
+    for (k=0;k<=A;k++) { var kills=Math.min(maxKills,Math.floor(k/wnpk)); pK[kills]+=pU[k]; }
     return pK;
   }
 
-  function convolveDists(d1, d2) {
-    var len = d1.length + d2.length - 1;
-    var result = [], i, j;
-    for (i = 0; i < len; i++) result[i] = 0;
-    for (i = 0; i < d1.length; i++) {
-      for (j = 0; j < d2.length; j++) result[i+j] += d1[i] * d2[j];
+  /* Build wound distribution (single model) using exact damage convolution */
+  function buildWoundDist(atk, def) {
+    var result=calcOne(atk,def), A=Math.max(1,atk.a);
+    var pFNP=def.fnpVal<7?rp(def.fnpVal):0;
+    var pPerAtk=Math.max(0,Math.min(0.99,result.unsaved/A))*(1-pFNP);
+    var faceDist=dmgFaceDist(atk.d,def.half,def.minus1,atk.rrd||'none');
+    var pU=[1], i, j;
+    for (i=0;i<A;i++) {
+      var next=[]; for (j=0;j<=i+1;j++) next[j]=0;
+      for (j=0;j<=i;j++) { next[j]+=pU[j]*(1-pPerAtk); next[j+1]+=pU[j]*pPerAtk; }
+      pU=next;
     }
-    return result;
+    /* build damage distributions for 0..maxK unsaved wounds */
+    var maxK=pU.length-1, kDists=[], k;
+    kDists[0]=[1];
+    for (i=1;i<=maxK;i++) kDists[i]=convolveDists(kDists[i-1],faceDist);
+    /* accumulate total damage distribution */
+    var totalDist=[];
+    for (k=0;k<=maxK;k++) {
+      if (!pU[k]||pU[k]<0.00001) continue;
+      var kD=kDists[k];
+      for (j=0;j<kD.length;j++) {
+        if (kD[j]>0) totalDist[j]=(totalDist[j]||0)+pU[k]*kD[j];
+      }
+    }
+    /* scrub floating-point residuals — any value below 1e-9 is noise */
+    for (i=0;i<totalDist.length;i++) { if ((totalDist[i]||0)<1e-9) totalDist[i]=0; }
+    return totalDist;
   }
 
   function toggleDist() {
-    var body  = document.getElementById('dist-body');
-    var arrow = document.getElementById('dist-arrow');
-    if (body.style.display === 'none') {
-      body.style.display = 'block';
-      arrow.innerHTML = '&#9663;';
-      renderDist();
-    } else {
-      body.style.display = 'none';
-      arrow.innerHTML = '&#9657;';
-    }
+    var body=document.getElementById('dist-body'), arrow=document.getElementById('dist-arrow');
+    if (body.style.display==='none') { body.style.display='block'; arrow.innerHTML='&#9663;'; renderDist(); }
+    else { body.style.display='none'; arrow.innerHTML='&#9657;'; }
   }
 
   function renderDist() {
-    var T        = +(document.getElementById('toughness').value) || 4;
-    var sv2      = +(document.getElementById('save').value);
-    var inv      = +(document.getElementById('invuln').value);
-    var fnpVal   = +(document.getElementById('fnp').value);
-    var W        = Math.max(1, +(document.getElementById('defWounds').value) || 1);
-    var unitSize = Math.max(1, +(document.getElementById('unitSize').value) || 1);
-    var cover    = document.getElementById('cover').checked;
-    var half     = document.getElementById('halfdmg').checked;
-    var minus1   = document.getElementById('dmgminus1').checked;
-    var minusHit   = document.getElementById('minusHit').checked;
-    var minusWound = document.getElementById('minusWound').checked;
-    var rrSave     = document.getElementById('rrSave').value;
-    var def = { T:T, sv2:sv2, inv:inv, fnpVal:fnpVal, W:W,
-                cover:cover, half:half, minus1:minus1,
-                minusHit:minusHit, minusWound:minusWound, rrSave:rrSave };
-    var i, combined = [1];
-    for (i = 0; i < atks.length; i++) combined = convolveDists(combined, buildKillDist(atks[i], def));
-    var rowCap = unitSize * 2;
-    var lastSig = 0;
-    for (i = 0; i < combined.length; i++) { if ((combined[i] || 0) >= 0.001) lastSig = i; }
-    var maxShow = Math.max(5, Math.min(lastSig, rowCap));
-    var maxProb = 0;
-    for (i = 0; i <= maxShow; i++) { if ((combined[i] || 0) > maxProb) maxProb = combined[i]; }
-    if (maxProb === 0) maxProb = 1;
-    var cumAtLeast = [], cs = 0;
-    for (i = combined.length - 1; i >= 0; i--) { cs += combined[i] || 0; cumAtLeast[i] = Math.min(1, cs); }
-    var html = '';
-    html += '<div style="display:grid;grid-template-columns:68px 1fr 58px 50px;gap:4px;margin-bottom:8px;padding:0 2px">';
-    html += '<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em">Kills</span>';
-    html += '<span></span>';
-    html += '<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em;text-align:right">&#8805; this</span>';
-    html += '<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em;text-align:right">Prob</span>';
-    html += '</div>';
-    for (i = 0; i <= maxShow; i++) {
-      var prob   = combined[i] || 0;
-      var pct    = prob * 100;
-      var cumPct = (cumAtLeast[i] || 0) * 100;
-      var barW   = (prob / maxProb) * 100;
-      var hue    = Math.round((prob / maxProb) * 120);
-      html += '<div style="display:grid;grid-template-columns:68px 1fr 58px 50px;gap:4px;align-items:center;margin-bottom:4px">';
-      html += '<span style="font-size:12px;color:var(--text-muted)">' + i + (i === 1 ? ' kill' : ' kills') + '</span>';
-      html += '<div style="background:var(--bg-input);border-radius:3px;height:16px;overflow:hidden">';
-      html += '<div style="width:' + barW.toFixed(1) + '%;height:100%;background:hsl(' + hue + ',55%,38%);border-radius:3px"></div>';
-      html += '</div>';
-      html += '<span style="font-size:12px;color:var(--text);text-align:right">' + cumPct.toFixed(1) + '%</span>';
-      html += '<span style="font-size:12px;color:var(--text-muted);text-align:right">' + pct.toFixed(1) + '%</span>';
-      html += '</div>';
+    var T=+(document.getElementById('toughness').value)||4;
+    var sv2=+(document.getElementById('save').value);
+    var inv=+(document.getElementById('invuln').value);
+    var fnpVal=+(document.getElementById('fnp').value);
+    var W=Math.max(1,+(document.getElementById('defWounds').value)||1);
+    var unitSize=Math.max(1,+(document.getElementById('unitSize').value)||1);
+    var cover=document.getElementById('cover').checked;
+    var half=document.getElementById('halfdmg').checked;
+    var minus1=document.getElementById('dmgminus1').checked;
+    var minusHit=document.getElementById('minusHit').checked;
+    var minusWound=document.getElementById('minusWound').checked;
+    var rrSave=document.getElementById('rrSave').value;
+    var def={T:T,sv2:sv2,inv:inv,fnpVal:fnpVal,W:W,cover:cover,half:half,minus1:minus1,minusHit:minusHit,minusWound:minusWound,rrSave:rrSave};
+    var isSingle=(unitSize===1), i, combined=[1];
+    for (i=0;i<atks.length;i++) combined=convolveDists(combined,isSingle?buildWoundDist(atks[i],def):buildKillDist(atks[i],def));
+    /* determine row range */
+    var sigT=isSingle?0.01:0.001, lastSig=0, rowCap=isSingle?1000:unitSize*2;
+    for (i=0;i<combined.length;i++) { if ((combined[i]||0)>=sigT) lastSig=i; }
+    var maxShow=isSingle?lastSig:Math.max(5,Math.min(lastSig,rowCap));
+    var maxProb=0;
+    for (i=0;i<=maxShow;i++) { if ((combined[i]||0)>maxProb) maxProb=combined[i]; }
+    if (maxProb===0) maxProb=1;
+    var cumAtLeast=[], cs=0;
+    for (i=combined.length-1;i>=0;i--) { cs+=(combined[i]||0); cumAtLeast[i]=Math.min(1,cs); }
+    var label=isSingle?'Wounds':'Kills';
+    var html='';
+    html+='<div style="display:grid;grid-template-columns:68px 1fr 58px 50px;gap:4px;margin-bottom:8px;padding:0 2px">';
+    html+='<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em">'+label+'</span>';
+    html+='<span></span>';
+    html+='<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em;text-align:right">&#8805; this</span>';
+    html+='<span style="font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em;text-align:right">Prob</span>';
+    html+='</div>';
+    for (i=0;i<=maxShow;i++) {
+      var prob=combined[i]||0;
+      if (prob<0.001) continue;
+      var pct=prob*100, cumPct=(cumAtLeast[i]||0)*100;
+      var barW=(prob/maxProb)*100, hue=Math.round((prob/maxProb)*120);
+      html+='<div style="display:grid;grid-template-columns:68px 1fr 58px 50px;gap:4px;align-items:center;margin-bottom:4px">';
+      html+='<span style="font-size:12px;color:var(--text-muted)">'+i+(isSingle?(i===1?' wound':' wounds'):(i===1?' kill':' kills'))+'</span>';
+      html+='<div style="background:var(--bg-input);border-radius:3px;height:16px;overflow:hidden">';
+      html+='<div style="width:'+barW.toFixed(1)+'%;height:100%;background:hsl('+hue+',55%,38%);border-radius:3px"></div>';
+      html+='</div>';
+      html+='<span style="font-size:12px;color:var(--text);text-align:right">'+cumPct.toFixed(1)+'%</span>';
+      html+='<span style="font-size:12px;color:var(--text-muted);text-align:right">'+pct.toFixed(1)+'%</span>';
+      html+='</div>';
     }
-    document.getElementById('dist-content').innerHTML = html;
+    document.getElementById('dist-content').innerHTML=html;
   }
 
   function calc() {
-    var T      = +(document.getElementById('toughness').value) || 4;
-    var sv2    = +(document.getElementById('save').value);
-    var inv    = +(document.getElementById('invuln').value);
-    var fnpVal = +(document.getElementById('fnp').value);
-    var W      = Math.max(1, +(document.getElementById('defWounds').value) || 1);
-    var unitSize = Math.max(1, +(document.getElementById('unitSize').value) || 1);
-    var cover  = document.getElementById('cover').checked;
-    var half   = document.getElementById('halfdmg').checked;
-    var minus1 = document.getElementById('dmgminus1').checked;
-    var minusHit   = document.getElementById('minusHit').checked;
-    var minusWound = document.getElementById('minusWound').checked;
-    var rrSave     = document.getElementById('rrSave').value;
-    var def = { T:T, sv2:sv2, inv:inv, fnpVal:fnpVal, W:W,
-                cover:cover, half:half, minus1:minus1,
-                minusHit:minusHit, minusWound:minusWound, rrSave:rrSave };
-
-    var noteEl = document.getElementById('coverNote');
-    var lblEl  = document.getElementById('coverLabel');
+    var T=+(document.getElementById('toughness').value)||4;
+    var sv2=+(document.getElementById('save').value);
+    var inv=+(document.getElementById('invuln').value);
+    var fnpVal=+(document.getElementById('fnp').value);
+    var W=Math.max(1,+(document.getElementById('defWounds').value)||1);
+    var unitSize=Math.max(1,+(document.getElementById('unitSize').value)||1);
+    var cover=document.getElementById('cover').checked;
+    var half=document.getElementById('halfdmg').checked;
+    var minus1=document.getElementById('dmgminus1').checked;
+    var minusHit=document.getElementById('minusHit').checked;
+    var minusWound=document.getElementById('minusWound').checked;
+    var rrSave=document.getElementById('rrSave').value;
+    var def={T:T,sv2:sv2,inv:inv,fnpVal:fnpVal,W:W,cover:cover,half:half,minus1:minus1,minusHit:minusHit,minusWound:minusWound,rrSave:rrSave};
+    var noteEl=document.getElementById('coverNote'), lblEl=document.getElementById('coverLabel');
     if (cover) {
-      var i, activeCt = 0, ignCt = 0;
-      for (i = 0; i < atks.length; i++) {
-        if (!(atks[i].ap === 0 && sv2 <= 3)) activeCt++;
-        if (atks[i].ignoresCover) ignCt++;
-      }
+      var i, actCt=0, ignCt=0;
+      for (i=0;i<atks.length;i++) { if (!(atks[i].ap===0&&sv2<=3)) actCt++; if (atks[i].ignoresCover) ignCt++; }
       noteEl.classList.add('show');
-      if (activeCt === 0) {
-        noteEl.className = 'cover-note show warn';
-        noteEl.textContent = 'Cover has no effect — AP 0 vs save 3+ or better for all profiles.';
-        lblEl.classList.remove('active');
-      } else {
-        noteEl.className = 'cover-note show ok';
-        noteEl.textContent = 'Cover active — armour save improved by 1 where applicable.' + (ignCt ? ' ' + ignCt + ' profile(s) ignore cover.' : '');
-        lblEl.classList.add('active');
-      }
+      if (actCt===0) { noteEl.className='cover-note show warn'; noteEl.textContent='Cover has no effect — AP 0 vs save 3+ or better for all profiles.'; lblEl.classList.remove('active'); }
+      else { noteEl.className='cover-note show ok'; noteEl.textContent='Cover active — armour save improved by 1 where applicable.'+(ignCt?' '+ignCt+' profile(s) ignore cover.':''); lblEl.classList.add('active'); }
+    } else { noteEl.className='cover-note'; lblEl.classList.remove('active'); }
+    var i, results=[];
+    for (i=0;i<atks.length;i++) results.push(calcOne(atks[i],def));
+    var totKills=0, totDmgAll=0, totA=0;
+    for (i=0;i<results.length;i++) { totKills+=results[i].kills; totDmgAll+=results[i].totDmg; }
+    for (i=0;i<atks.length;i++) totA+=atks[i].a;
+    var atkPer=totKills>0?(totA/totKills).toFixed(2):'&#8734;';
+    var html='';
+    if (atks.length===1) {
+      var r=results[0], a=atks[0], axA=!isNaN(parseInt(a.antiXVal,10));
+      html+='<div class="metrics">';
+      html+='<div class="met"><div class="ml">Avg hits</div><div class="mv">'+r.totH.toFixed(2)+'</div></div>';
+      html+='<div class="met"><div class="ml">Avg wounds</div><div class="mv">'+r.totW.toFixed(2)+'</div></div>';
+      html+='<div class="met"><div class="ml">Unsaved wounds</div><div class="mv">'+r.unsaved.toFixed(2)+'</div></div>';
+      html+='<div class="met"><div class="ml">Avg damage</div><div class="mv">'+r.totDmg.toFixed(2)+'</div></div>';
+      html+='</div>';
+      html+='<div class="big-stats">';
+      html+='<div class="stat-box"><div class="sl">Expected models killed</div><div class="sv sv-kills">'+r.kills.toFixed(2)+'</div></div>';
+      if (unitSize>1) { var pK=Math.min(100,(r.kills/unitSize)*100); html+='<div class="stat-box"><div class="sl">% of unit killed</div><div class="sv sv-kills">'+pK.toFixed(1)+'%</div></div>'; }
+      else { html+='<div class="stat-box"><div class="sl">Shots needed to kill</div><div class="sv sv-atk">'+atkPer+'</div></div>'; }
+      html+='</div>';
+      html+='<div class="chain">';
+      html+='<div class="cs"><div class="cn">'+a.a+'</div><div class="cl">attacks</div></div><div class="ca">&#8594;</div>';
+      html+='<div class="cs"><div class="cn">'+r.totH.toFixed(2)+'</div><div class="cl">hits</div></div><div class="ca">&#8594;</div>';
+      html+='<div class="cs"><div class="cn">'+r.totW.toFixed(2)+'</div><div class="cl">wounds</div></div><div class="ca">&#8594;</div>';
+      html+='<div class="cs"><div class="cn">'+r.unsaved.toFixed(2)+'</div><div class="cl">unsaved</div></div><div class="ca">&#8594;</div>';
+      html+='<div class="cs"><div class="cn">'+r.totDmg.toFixed(2)+'</div><div class="cl">damage</div></div>';
+      html+='</div>';
+      html+='<div class="note">Wound on '+r.effWnd+'+'+(axA?' (Anti-X '+a.antiXVal+'+)':'')
+           +' &#183; Eff. save: '+(r.effSv>6?'none':r.effSv+'+')
+           +' ('+(r.pFail*100).toFixed(0)+'% fail)'
+           +(r.pFNP>0?' &#183; FNP '+fnpVal+'+++':'')+'</div>';
     } else {
-      noteEl.className = 'cover-note';
-      lblEl.classList.remove('active');
+      html+='<div class="bk-hdr"><span style="flex:1">Profile</span><span style="min-width:50px;text-align:right">Hits</span><span style="min-width:60px;text-align:right">Damage</span><span style="min-width:70px;text-align:right">Kills</span></div>';
+      for (i=0;i<results.length;i++) {
+        html+='<div class="bk-row"><span class="bk-lbl"><span class="atk-num">'+(i+1)+'</span></span>';
+        html+='<span class="bk-hits">'+results[i].totH.toFixed(2)+'</span>';
+        html+='<span class="bk-dmg">'+results[i].totDmg.toFixed(2)+'</span>';
+        html+='<span class="bk-kills">'+results[i].kills.toFixed(2)+'</span></div>';
+      }
+      html+='<div class="bk-row total"><span class="bk-lbl" style="color:var(--accent-light);font-weight:600">Total</span><span class="bk-hits"></span>';
+      html+='<span class="bk-dmg" style="color:var(--blue);font-weight:600">'+totDmgAll.toFixed(2)+'</span>';
+      html+='<span class="bk-kills" style="font-size:17px">'+totKills.toFixed(2)+'</span></div>';
+      html+='<div class="big-stats" style="margin-top:10px"><div class="stat-box"><div class="sl">Total expected kills</div><div class="sv sv-kills">'+totKills.toFixed(2)+'</div></div>';
+      if (unitSize>1) { var pKM=Math.min(100,(totKills/unitSize)*100); html+='<div class="stat-box"><div class="sl">% of unit killed</div><div class="sv sv-kills">'+pKM.toFixed(1)+'%</div></div>'; }
+      html+='</div>';
     }
-
-    var i, results = [];
-    for (i = 0; i < atks.length; i++) results.push(calcOne(atks[i], def));
-    var totKills = 0, totDmgAll = 0, totA = 0;
-    for (i = 0; i < results.length; i++) { totKills += results[i].kills; totDmgAll += results[i].totDmg; }
-    for (i = 0; i < atks.length; i++) totA += atks[i].a;
-    var atkPer = totKills > 0 ? (totA / totKills).toFixed(2) : '&#8734;';
-
-    var html = '';
-    if (atks.length === 1) {
-      var r = results[0], a = atks[0];
-      var axActive = !isNaN(parseInt(a.antiXVal, 10));
-      html += '<div class="metrics">';
-      html +=   '<div class="met"><div class="ml">Avg hits</div><div class="mv">' + r.totH.toFixed(2) + '</div></div>';
-      html +=   '<div class="met"><div class="ml">Avg wounds</div><div class="mv">' + r.totW.toFixed(2) + '</div></div>';
-      html +=   '<div class="met"><div class="ml">Unsaved wounds</div><div class="mv">' + r.unsaved.toFixed(2) + '</div></div>';
-      html +=   '<div class="met"><div class="ml">Avg damage</div><div class="mv">' + r.totDmg.toFixed(2) + '</div></div>';
-      html += '</div>';
-      html += '<div class="big-stats">';
-      html +=   '<div class="stat-box"><div class="sl">Expected models killed</div><div class="sv sv-kills">' + r.kills.toFixed(2) + '</div></div>';
-      if (unitSize > 1) {
-        var pctKilled = Math.min(100, (r.kills / unitSize) * 100);
-        html += '<div class="stat-box"><div class="sl">% of unit killed</div><div class="sv sv-kills">' + pctKilled.toFixed(1) + '%</div></div>';
-      } else {
-        html += '<div class="stat-box"><div class="sl">Shots needed to kill</div><div class="sv sv-atk">' + atkPer + '</div></div>';
-      }
-      html += '</div>';
-      html += '<div class="chain">';
-      html +=   '<div class="cs"><div class="cn">' + a.a + '</div><div class="cl">attacks</div></div>';
-      html +=   '<div class="ca">&#8594;</div>';
-      html +=   '<div class="cs"><div class="cn">' + r.totH.toFixed(2) + '</div><div class="cl">hits</div></div>';
-      html +=   '<div class="ca">&#8594;</div>';
-      html +=   '<div class="cs"><div class="cn">' + r.totW.toFixed(2) + '</div><div class="cl">wounds</div></div>';
-      html +=   '<div class="ca">&#8594;</div>';
-      html +=   '<div class="cs"><div class="cn">' + r.unsaved.toFixed(2) + '</div><div class="cl">unsaved</div></div>';
-      html +=   '<div class="ca">&#8594;</div>';
-      html +=   '<div class="cs"><div class="cn">' + r.totDmg.toFixed(2) + '</div><div class="cl">damage</div></div>';
-      html += '</div>';
-      html += '<div class="note">Wound on ' + r.effWnd + '+' + (axActive ? ' (Anti-X ' + a.antiXVal + '+)' : '')
-            + ' &#183; Eff. save: ' + (r.effSv > 6 ? 'none' : r.effSv + '+')
-            + ' (' + (r.pFail * 100).toFixed(0) + '% fail)'
-            + (r.pFNP > 0 ? ' &#183; FNP ' + fnpVal + '+++' : '') + '</div>';
-    } else {
-      html += '<div class="bk-hdr"><span style="flex:1">Profile</span>';
-      html += '<span style="min-width:50px;text-align:right">Hits</span>';
-      html += '<span style="min-width:60px;text-align:right">Damage</span>';
-      html += '<span style="min-width:70px;text-align:right">Kills</span></div>';
-      for (i = 0; i < results.length; i++) {
-        html += '<div class="bk-row"><span class="bk-lbl"><span class="atk-num">' + (i+1) + '</span></span>';
-        html += '<span class="bk-hits">' + results[i].totH.toFixed(2) + '</span>';
-        html += '<span class="bk-dmg">' + results[i].totDmg.toFixed(2) + '</span>';
-        html += '<span class="bk-kills">' + results[i].kills.toFixed(2) + '</span></div>';
-      }
-      html += '<div class="bk-row total">';
-      html += '<span class="bk-lbl" style="color:var(--accent-light);font-weight:600">Total</span>';
-      html += '<span class="bk-hits"></span>';
-      html += '<span class="bk-dmg" style="color:var(--blue);font-weight:600">' + totDmgAll.toFixed(2) + '</span>';
-      html += '<span class="bk-kills" style="font-size:17px">' + totKills.toFixed(2) + '</span></div>';
-      html += '<div class="big-stats" style="margin-top:10px">';
-      html += '<div class="stat-box"><div class="sl">Total expected kills</div><div class="sv sv-kills">' + totKills.toFixed(2) + '</div></div>';
-      if (unitSize > 1) {
-        var pctKilledMulti = Math.min(100, (totKills / unitSize) * 100);
-        html += '<div class="stat-box"><div class="sl">% of unit killed</div><div class="sv sv-kills">' + pctKilledMulti.toFixed(1) + '%</div></div>';
-      }
-      html += '</div>';
-    }
-    document.getElementById('res-content').innerHTML = html;
+    document.getElementById('res-content').innerHTML=html;
     renderDist();
   }
 
