@@ -850,6 +850,10 @@
       html += '<span class="bk-kills" style="font-size:17px">' + totKills.toFixed(2) + '</span></div>';
       html += '<div class="big-stats" style="margin-top:10px">';
       html += '<div class="stat-box"><div class="sl">Total expected kills</div><div class="sv sv-kills">' + totKills.toFixed(2) + '</div></div>';
+      if (unitSize > 1) {
+        var pctKilledMulti = Math.min(100, (totKills / unitSize) * 100);
+        html += '<div class="stat-box"><div class="sl">% of unit killed</div><div class="sv sv-kills">' + pctKilledMulti.toFixed(1) + '%</div></div>';
+      }
       html += '</div>';
     }
     document.getElementById('res-content').innerHTML = html;
